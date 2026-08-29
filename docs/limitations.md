@@ -1441,3 +1441,54 @@ abstention quietly undoes the thing the confidence system exists to do: a
 participant or researcher watching a smoothly pulsing orb has no way to know
 the number underneath it is two minutes stale. Verified in a browser in both
 states.
+
+## 27. The researcher side
+
+The participant flow existed; the researcher side was a JSON endpoint and a
+curl command. `/studies` closes the loop: create a study, copy its participant
+link, watch sessions arrive, read the aggregate.
+
+### Coverage travels with every number
+
+The dashboard leads with participants, **usable sessions**, and answered-window
+rate, before any heart rate appears. The overlay chart states how many sessions
+were omitted for too little signal, and per-session rows carry a usable /
+too-little-signal verdict.
+
+This is not decoration either. Half of real sessions yield little (section 15),
+so a mean heart rate across a study is meaningless without the number saying
+how much of the study produced it.
+
+Timelines are drawn with gaps where the engine declined. Joining across an
+abstention would draw a line through data the engine explicitly refused to
+provide.
+
+### Three defects found by looking at it
+
+**Calibration counted against sessions.** The aggregate treated any window
+without a state as unanswered, including the 45 s calibration period. A session
+with 94% real coverage scored 55%, and one at 72% fell below the usable
+threshold entirely -- seven healthy sessions read as three. Calibration is now
+excluded from the denominator and reported separately. This is the same
+mistake, in a different place, as the chart that once coloured calibration red
+(section 24): normal operation rendered as failure.
+
+**The chart never drew on a first load.** The canvas was sized while its panel
+was still `display:none`, so `clientWidth` was 0. It appeared only if a resize
+happened to fire afterwards -- which is exactly what happened during the first
+check, hiding the bug.
+
+**The test suite was writing to the real database.** Studies created by
+`tests/test_api.py` showed up in the dashboard. The store path is now
+overridable and `tests/conftest.py` points every run at a temporary file, with
+a test that asserts it.
+
+### What is deliberately missing
+
+**There is no authentication.** Anyone who can reach the server reads every
+study. The page says so in a banner rather than leaving it to be discovered.
+That is acceptable for a laptop and for nothing else, and it is the first thing
+to fix before this is exposed to a network.
+
+Also absent: per-researcher accounts, study sharing, CSV export, and any
+event-aligned statistics beyond the overlay.

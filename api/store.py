@@ -37,6 +37,7 @@ is not answered here. See docs/privacy.md.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import sqlite3
 import time
@@ -45,7 +46,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional
 
-DEFAULT_DB = Path("data/neuroproxy.db")
+# Overridable so tests never touch a real study database. Test runs were
+# writing into data/neuroproxy.db and leaving studies behind in the dashboard.
+DEFAULT_DB = Path(os.environ.get("NEUROPROXY_DB", "data/neuroproxy.db"))
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS studies (

@@ -41,6 +41,8 @@ produces confident numbers with nothing underneath them.
 | Retention windows, purge, participant data export | done, tested |
 | Guided setup with live coaching before the session | done |
 | Study-level aggregate with coverage alongside | done, tested |
+| Researcher dashboard: create, share, watch, aggregate | done, tested |
+| Authentication | **absent** -- do not expose the host |
 | Neural rPPG (EfficientPhys, pretrained) | benchmarked, **does not transfer** |
 | Fine-tuning, waveform objective | **blocked by label sync**, limitations 22 |
 | Fine-tuning, phase-invariant objective | works; error halved, still behind POS |
@@ -345,8 +347,13 @@ curl -s localhost:8000/v1/studies -H 'Content-Type: application/json' \
   -d '{"name":"checkout test","retention_days":30}'
 ```
 
-`GET /v1/studies/{id}/aggregate` reports the usable-session rate alongside every
-aggregate, because a mean over sessions that mostly declined is not a finding.
+Or use the researcher view at http://localhost:8000/studies: create a study,
+copy its participant link, and watch sessions arrive. It leads with participants,
+usable sessions and answered-window rate before any heart rate, because a mean
+over sessions that mostly declined is not a finding.
+
+**There is no authentication.** Anyone who can reach the server reads every
+study. Fine on a laptop, nowhere else.
 
 `POST /v1/sessions` to open one, push frames over
 `WS /v1/sessions/{id}/stream`, read `GET /v1/sessions/{id}/summary`. State is

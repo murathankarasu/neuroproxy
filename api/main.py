@@ -150,17 +150,24 @@ def aggregate(study_id: str) -> Dict[str, object]:
     rows = []
     for sess in STORE.study_sessions(study_id):
         samples = STORE.get_samples(sess["session_id"])
-        answered = [s for s in samples if s.get("state")]
+        # Calibration windows are excluded from the denominator. Counting them
+        # as unanswered penalises a session for the 45 s it spent working
+        # normally, and made healthy sessions read as failures.
+        scored = [s for s in samples if s.get("reason") != "calibrating"]
+        answered = [s for s in scored if s.get("state")]
         hrs = [s["physiology"]["heart_rate_bpm"] for s in samples
                if (s.get("physiology") or {}).get("heart_rate_bpm") is not None]
+        ratio = (len(answered) / len(scored)) if scored else 0.0
         rows.append({
             "session_id": sess["session_id"],
             "external_ref": sess["external_ref"],
             "emissions": len(samples),
+            "calibrating": len(samples) - len(scored),
+            "scored": len(scored),
             "answered": len(answered),
-            "answered_ratio": (len(answered) / len(samples)) if samples else 0.0,
+            "answered_ratio": ratio,
             "median_hr": float(np.median(hrs)) if hrs else None,
-            "usable": bool(samples) and (len(answered) / len(samples)) >= 0.5,
+            "usable": bool(scored) and ratio >= 0.5,
         })
     usable = [r for r in rows if r["usable"]]
     return {
@@ -171,7 +178,7 @@ def aggregate(study_id: str) -> Dict[str, object]:
         "usable_sessions": len(usable),
         "usable_session_rate": (len(usable) / len(rows)) if rows else 0.0,
         "pooled_answered_ratio": (
-            sum(r["answered"] for r in rows) / max(sum(r["emissions"] for r in rows), 1)),
+            sum(r["answered"] for r in rows) / max(sum(r["scored"] for r in rows), 1)),
         "sessions": rows,
     }
 
@@ -222,6 +229,7 @@ def purge() -> Dict[str, int]:
 
 DEMO_DIR = _Path(__file__).resolve().parents[1] / "apps" / "web_demo"
 DEMO_PAGE = DEMO_DIR / "index.html"
+DASHBOARD_PAGE = DEMO_DIR / "dashboard.html"
 
 
 @app.get("/static/{path:path}")
@@ -231,6 +239,19 @@ def demo_asset(path: str) -> FileResponse:
     if not str(target).startswith(str(DEMO_DIR.resolve())) or not target.is_file():
         raise HTTPException(404, "not found")
     return FileResponse(str(target))
+
+
+@app.get("/studies")
+def dashboard() -> FileResponse:
+    """Researcher view: create studies, hand out links, watch sessions arrive.
+
+    NO AUTHENTICATION. Anyone who can reach the server can read every study.
+    That is acceptable for a laptop demo and nowhere else; the page says so
+    itself rather than leaving it to be discovered.
+    """
+    if not DASHBOARD_PAGE.exists():
+        raise HTTPException(404, "dashboard not found")
+    return FileResponse(str(DASHBOARD_PAGE))
 
 
 @app.get("/")

@@ -191,6 +191,19 @@ def test_retention_has_no_unbounded_option():
     assert client.post("/v1/studies", json={"name": "x", "retention_days": 99999}).status_code == 422
 
 
+def test_the_suite_is_not_writing_to_the_real_database():
+    """A guard, because this was a real regression: the suite used to create
+    studies in the database the dashboard reads from."""
+    import os
+
+    from api.main import STORE
+
+    assert "neuroproxy-test-" in str(STORE.path), (
+        "tests are pointed at {} -- conftest.py should have redirected "
+        "NEUROPROXY_DB".format(STORE.path))
+    assert os.environ.get("NEUROPROXY_DB")
+
+
 def test_sessions_survive_a_restart():
     """Summaries come from the store, not from a process-local dict."""
     import api.main as m
@@ -200,3 +213,72 @@ def test_sessions_survive_a_restart():
     m.SESSIONS.clear()                     # simulate a restart
     summary = client.get("/v1/sessions/{}/summary".format(sid)).json()
     assert summary["events"] == [{"t": 2.0, "label": "e"}]
+
+
+# --- researcher dashboard and aggregate honesty ---------------------------
+
+def test_dashboard_is_served_and_declares_its_own_gap():
+    """It has no auth. The page must say so rather than let it be discovered."""
+    page = client.get("/studies")
+    assert page.status_code == 200
+    body = page.text
+    assert "No authentication" in body
+    assert "Do not expose this host" in body
+    # Coverage has to be visible next to the aggregates, not buried.
+    assert "Usable sessions" in body and "Answered windows" in body
+
+
+def test_calibration_does_not_count_against_a_session():
+    """The regression this fixed: healthy sessions read as failures.
+
+    Counting the 45 s calibration period as unanswered dragged a session with
+    94% real coverage down to 55%, and a 72% one below the usable threshold
+    entirely. Calibration is normal operation, not a refusal.
+    """
+    study = client.post("/v1/studies", json={"name": "calib", "retention_days": 7}).json()
+    sid = client.post("/v1/sessions?study_id={}".format(study["study_id"]),
+                      json={"fps": 30.0}).json()["session_id"]
+
+    from api.main import STORE
+
+    samples = []
+    for i in range(100):
+        calibrating = i < 45
+        samples.append({
+            "session_id": sid, "t": 20.0 + i,
+            "physiology": {"heart_rate_bpm": 72.0},
+            "state": None if calibrating else {"arousal_proxy": {"value": 1.0}},
+            "quality": {"overall": 0.8}, "confidence": 0.5,
+            "reason": "calibrating" if calibrating else None, "calibrated": not calibrating,
+        })
+    STORE.append_samples(sid, samples)
+
+    row = client.get("/v1/studies/{}/aggregate".format(study["study_id"])).json()["sessions"][0]
+    assert row["emissions"] == 100
+    assert row["calibrating"] == 45
+    assert row["scored"] == 55
+    # Every scored window was answered, so this is a fully usable session.
+    assert row["answered_ratio"] == pytest.approx(1.0)
+    assert row["usable"] is True
+
+
+def test_aggregate_marks_low_signal_sessions_rather_than_averaging_them_in():
+    study = client.post("/v1/studies", json={"name": "mixed", "retention_days": 7}).json()
+    from api.main import STORE
+
+    for ref, answered in (("good", True), ("bad", False)):
+        sid = client.post("/v1/sessions?study_id={}&external_ref={}".format(
+            study["study_id"], ref), json={"fps": 30.0}).json()["session_id"]
+        STORE.append_samples(sid, [{
+            "session_id": sid, "t": 20.0 + i,
+            "physiology": {"heart_rate_bpm": 70.0 if answered else None},
+            "state": {"arousal_proxy": {"value": 0.0}} if answered else None,
+            "quality": {"overall": 0.8}, "confidence": 0.5,
+            "reason": None if answered else "low_confidence", "calibrated": True,
+        } for i in range(20)])
+
+    agg = client.get("/v1/studies/{}/aggregate".format(study["study_id"])).json()
+    by_ref = {r["external_ref"]: r for r in agg["sessions"]}
+    assert by_ref["good"]["usable"] is True
+    assert by_ref["bad"]["usable"] is False
+    assert agg["usable_session_rate"] == pytest.approx(0.5)
