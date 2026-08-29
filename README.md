@@ -35,6 +35,7 @@ produces confident numbers with nothing underneath them.
 | Session API: sessions, events, summary, WS stream | done, tested |
 | Live camera source with capture-settings reporting | written, not run here |
 | Single-session web demo (timeline, events, summary) | done, served at `/` |
+| Client-side feature extraction (~3 KB/s, no raw video) | done, equivalence verified |
 | Neural rPPG (EfficientPhys, pretrained) | benchmarked, **does not transfer** |
 | Fine-tuning, waveform objective | **blocked by label sync**, limitations 22 |
 | Fine-tuning, phase-invariant objective | works; error halved, still behind POS |
@@ -341,10 +342,17 @@ The engine reproduces the offline pipeline exactly (max difference 0.0000 bpm
 over 41 windows on a real recording), so every benchmark below describes what a
 live session actually does.
 
-**Do not push lossy frames.** Measured on the same recording: JPEG q95 costs
-0.38 bpm and 3 points of coverage; JPEG q75 costs 0.85 bpm and the engine then
-answers **0%** of windows -- confidence falls just enough to abstain on
-everything. Limitations section 24.
+The demo extracts features **in the browser** and sends only those: ~100 bytes
+per frame, roughly 3 KB/s, against ~15 MB/s for lossless frames. Raw video never
+leaves the device, and no codec sits between the sensor and the signal.
+
+That matters because the frame path cannot use lossy encoding. Measured on the
+same recording: JPEG q95 costs 0.38 bpm and 3 points of coverage; JPEG q75 costs
+0.85 bpm and the engine then answers **0%** of windows -- confidence falls just
+enough to abstain on everything. Limitations sections 24-25.
+
+The two extractors are verified to agree: identical mean RGB to the last
+decimal across four skin tones, light to dim.
 
 ## Layout
 

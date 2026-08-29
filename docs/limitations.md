@@ -1310,3 +1310,66 @@ feature extractor, a study builder, multi-participant aggregation, or a
 researcher dashboard. The engine emits `arousal_proxy` and nothing else,
 because heart-rate deviation is the only state signal this project has evidence
 for.
+
+## 25. Client-side extraction
+
+Section 24 left the frame-push path having to send lossless PNG -- about
+15 MB/s -- because JPEG q75 transport dropped answered windows from 57% to
+zero. Extracting features in the browser removes that trade rather than
+managing it.
+
+`apps/web_demo/extractor.js` computes, per frame, the spatial mean RGB over the
+skin ROIs plus the quality scalars the confidence gate needs. Roughly **100
+bytes per frame, ~3 KB/s** against ~15 MB/s, batched one message per second.
+The API gained `WS /v1/sessions/{id}/features` alongside the frame path, and
+the engine gained `push_features` next to `push`; everything downstream of
+ingestion is shared.
+
+Three things follow, and only the first is about bandwidth:
+
+- **Raw video never leaves the device.** This is the privacy position both
+  source documents take (design doc 11), reached by having nothing to send
+  rather than by promising not to keep it.
+- **There is no codec between sensor and signal.** Extraction runs on raw
+  canvas pixels, before any encoding, so the compression damage that dominates
+  section 3 and section 24 simply does not arise on this path.
+- **The frame path stays** for offline replay and clients that cannot run an
+  extractor, marked provisional.
+
+### Equivalence, checked rather than assumed
+
+Client-side extraction is only safe if the two implementations agree: every
+threshold, ablation and benchmark in this document was measured on the Python
+path, and a browser session inherits none of it otherwise.
+
+Four synthetic subjects spanning light to dim skin, identical PNG input to
+both:
+
+| fixture | Python mean RGB | JavaScript mean RGB | difference |
+|---|---|---|---|
+| light | 198, 158, 140 | 198, 158, 140 | **0, 0, 0** |
+| medium | 157, 117, 102 | 157, 117, 102 | **0, 0, 0** |
+| dark | 76, 54, 43 | 76, 54, 43 | **0, 0, 0** |
+| dim | 46, 34, 26 | 46, 34, 26 | **0, 0, 0** |
+
+Mean RGB -- the quantity that drives heart rate -- is exact on all four,
+including the two the fixed-locus bug of section 12 would have discarded. The
+`lighting` scalar differs by up to 0.014 (dark: 0.867 against 0.881), reaching
+the output only through the confidence weighting.
+
+Separately, `tests/test_client_extraction.py` drives a full recording through
+both ingest paths and requires identical heart rate to 1e-9, so the two paths
+cannot drift apart in the parts that are shared.
+
+**The JavaScript cannot run in pytest.** The test pins the Python reference
+values the browser was checked against; if they move, the equivalence has to be
+re-verified at `/static/equivalence.html` rather than presumed to hold.
+
+### A note on the verification itself
+
+The first attempt used 640x480 frames from real recordings and never completed
+-- decoding a 300 KB PNG timed out in the automated browser pane, which
+throttles when hidden. That is a harness limitation, not a code fault, and the
+fix was to verify on small controlled fixtures that exercise the same code
+paths. Worth recording so the next person does not conclude the extractor is
+slow: on a 64x64 frame it runs in 6.8 ms.

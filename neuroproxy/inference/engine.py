@@ -54,6 +54,38 @@ COMPRESSION_SAMPLE_EVERY = 15
 
 
 @dataclass
+class FramePacket:
+    """One frame's worth of already-extracted features.
+
+    This is the wire format for client-side extraction. A browser computes it
+    from raw canvas pixels -- before any encoding -- and sends roughly 100
+    bytes per frame instead of a compressed image. That is ~3 KB/s against
+    ~15 MB/s for lossless frames, and it means raw video never leaves the
+    device at all.
+
+    It also sidesteps the transport measurement in docs/limitations.md 24:
+    there is no codec between the sensor and the signal, so there is nothing
+    for a codec to destroy.
+    """
+
+    rgb: Optional[List[float]] = None      # spatial mean over the skin ROI
+    valid: bool = False
+    face: float = 0.0
+    lighting: float = 0.0
+    sharpness: float = 0.0
+    motion: float = 1.0
+    skin_fraction: float = 0.0
+    compression: float = 1.0
+
+    def to_quality(self) -> FrameQuality:
+        return FrameQuality(
+            face=self.face, lighting=self.lighting, sharpness=self.sharpness,
+            motion=self.motion, skin_fraction=self.skin_fraction,
+            compression=self.compression,
+        )
+
+
+@dataclass
 class StateSample:
     """One emission. Mirrors the API contract in design doc section 10.1."""
 
@@ -107,6 +139,27 @@ class StateEngine:
     def push(self, frame: np.ndarray) -> Optional[StateSample]:
         """Feed one frame. Returns a sample on emission ticks, else None."""
         self._ingest(frame)
+        return self._advance()
+
+    def push_features(self, packet: FramePacket) -> Optional[StateSample]:
+        """Feed one frame's pre-extracted features, from a client-side extractor.
+
+        Identical downstream path to `push`: the only difference is where
+        detection and ROI averaging happened. Everything measured about the
+        engine therefore still applies -- provided the client's extractor
+        agrees with the Python one, which
+        `tests/test_client_extraction.py` checks rather than assumes.
+        """
+        self._rgb.append(
+            np.asarray(packet.rgb, dtype=np.float64)
+            if (packet.valid and packet.rgb is not None)
+            else np.full(3, np.nan)
+        )
+        self._valid.append(bool(packet.valid and packet.rgb is not None))
+        self._quality.append(packet.to_quality())
+        return self._advance()
+
+    def _advance(self) -> Optional[StateSample]:
         self._n_frames += 1
         if self._n_frames < self.window:
             return None

@@ -14,14 +14,21 @@ documents make raw-video retention the default-off position (design doc
 section 11), and the cheapest way to keep that promise is to have nowhere to
 put it.
 
-ARCHITECTURAL CAVEAT, STATED UP FRONT
--------------------------------------
-This version accepts *frames* over the socket, which means raw video crosses
-the network even though it is never written down. The target architecture in
-design doc section 10.2 extracts features on the client and sends only those.
-That is the right end state for both privacy and bandwidth; this is the
-server-side version that makes the contract testable first. Anything built on
-top should treat the frame-push path as provisional.
+TWO INGEST PATHS
+----------------
+`/stream` accepts frames. `/features` accepts per-frame features extracted on
+the client. The second is the one to build on:
+
+* Raw video never leaves the device, which is the privacy position both source
+  documents take (design doc section 11).
+* ~100 bytes per frame instead of a compressed image -- roughly 3 KB/s against
+  15 MB/s for the lossless frames the frame path requires.
+* No codec sits between the sensor and the signal. The frame path had to send
+  lossless PNG because JPEG q75 transport drops answered windows from 57% to
+  zero (docs/limitations.md 24); the feature path removes that trade entirely.
+
+The frame path remains for offline replay and for clients that cannot run an
+extractor, and is marked provisional.
 """
 from __future__ import annotations
 
@@ -38,7 +45,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse
 from pathlib import Path as _Path
 
-from neuroproxy.inference import StateEngine, StateSample
+from neuroproxy.inference import FramePacket, StateEngine, StateSample
 from neuroproxy.rppg.base import available_methods
 
 ENGINE_VERSION = "0.1.0"
@@ -82,7 +89,17 @@ class Session:
 SESSIONS: Dict[str, Session] = {}
 
 
-DEMO_PAGE = _Path(__file__).resolve().parents[1] / "apps" / "web_demo" / "index.html"
+DEMO_DIR = _Path(__file__).resolve().parents[1] / "apps" / "web_demo"
+DEMO_PAGE = DEMO_DIR / "index.html"
+
+
+@app.get("/static/{path:path}")
+def demo_asset(path: str) -> FileResponse:
+    """Serve the demo's own assets (extractor, equivalence fixtures)."""
+    target = (DEMO_DIR / path).resolve()
+    if not str(target).startswith(str(DEMO_DIR.resolve())) or not target.is_file():
+        raise HTTPException(404, "not found")
+    return FileResponse(str(target))
 
 
 @app.get("/")
@@ -169,6 +186,69 @@ def summary(session_id: str) -> Dict[str, object]:
         "events": session.events,
         "timeline": [s.as_dict() for s in samples],
     }
+
+
+@app.websocket("/v1/sessions/{session_id}/features")
+async def features(websocket: WebSocket, session_id: str) -> None:
+    """Accept client-extracted per-frame features.
+
+    Message is JSON, either one packet or a batch:
+        {"rgb": [r, g, b], "valid": true, "face": 0.9, ...}
+        {"frames": [ {...}, {...} ]}
+
+    Batching matters: at 30 fps one WebSocket message per frame is mostly
+    framing overhead, and the engine only emits once per second anyway.
+    """
+    await websocket.accept()
+    session = SESSIONS.get(session_id)
+    if session is None:
+        await websocket.close(code=4404)
+        return
+    try:
+        while True:
+            data = await websocket.receive_json()
+            if data.get("close"):
+                break
+            packets = data.get("frames") or [data]
+            emitted = []
+            for raw in packets:
+                sample = session.engine.push_features(_packet(raw))
+                if sample is not None:
+                    session.samples.append(sample)
+                    emitted.append(sample.as_dict())
+            for sample in emitted:
+                await websocket.send_json(sample)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        session.closed = True
+
+
+def _packet(raw: Dict[str, object]) -> FramePacket:
+    def num(key: str, default: float) -> float:
+        try:
+            return float(raw.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    rgb = raw.get("rgb")
+    if isinstance(rgb, list) and len(rgb) == 3:
+        try:
+            rgb = [float(v) for v in rgb]
+        except (TypeError, ValueError):
+            rgb = None
+    else:
+        rgb = None
+    return FramePacket(
+        rgb=rgb,
+        valid=bool(raw.get("valid")) and rgb is not None,
+        face=num("face", 0.0),
+        lighting=num("lighting", 0.0),
+        sharpness=num("sharpness", 0.0),
+        motion=num("motion", 1.0),
+        skin_fraction=num("skin_fraction", 0.0),
+        compression=num("compression", 1.0),
+    )
 
 
 @app.websocket("/v1/sessions/{session_id}/stream")

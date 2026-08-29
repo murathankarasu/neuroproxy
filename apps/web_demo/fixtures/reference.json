@@ -1,0 +1,70 @@
+{
+  "light.png": {
+    "valid": true,
+    "rgb": [
+      198.0,
+      158.0,
+      140.0
+    ],
+    "skin_fraction": 1.0,
+    "face": {
+      "x": 26,
+      "y": 12,
+      "w": 77,
+      "h": 73
+    },
+    "lighting": 1.0,
+    "sharpness": 0.998
+  },
+  "medium.png": {
+    "valid": true,
+    "rgb": [
+      157.0,
+      117.0,
+      102.0
+    ],
+    "skin_fraction": 1.0,
+    "face": {
+      "x": 26,
+      "y": 12,
+      "w": 77,
+      "h": 73
+    },
+    "lighting": 1.0,
+    "sharpness": 0.995
+  },
+  "dark.png": {
+    "valid": true,
+    "rgb": [
+      76.0,
+      54.0,
+      43.0
+    ],
+    "skin_fraction": 1.0,
+    "face": {
+      "x": 26,
+      "y": 12,
+      "w": 77,
+      "h": 73
+    },
+    "lighting": 0.867,
+    "sharpness": 0.956
+  },
+  "dim.png": {
+    "valid": true,
+    "rgb": [
+      46.0,
+      34.0,
+      26.0
+    ],
+    "skin_fraction": 1.0,
+    "face": {
+      "x": 26,
+      "y": 12,
+      "w": 77,
+      "h": 73
+    },
+    "lighting": 0.58,
+    "sharpness": 0.681
+  }
+}

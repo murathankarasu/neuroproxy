@@ -78,18 +78,23 @@
   </div>
 
   <p class="note">
-    Frames are sent as lossless PNG on purpose. Measured on a real recording, JPEG q75
-    transport costs only 0.85&nbsp;bpm of accuracy but drops answered windows from 57% to
-    <b>0%</b> &mdash; confidence falls just far enough to abstain on everything. That bandwidth
-    is why the production path extracts features in the browser and sends those instead.
-    Video is never stored server-side.
+    Features are extracted <b>in this page</b> and only those are sent &mdash; about 100 bytes
+    per frame, roughly 3&nbsp;KB/s, against ~15&nbsp;MB/s for lossless frames.
+    <b>Raw video never leaves your device.</b> It also removes the codec entirely: pushing
+    JPEG&nbsp;q75 frames instead costs little accuracy but drops answered windows from 57% to
+    <b>0%</b>, because confidence falls just far enough to abstain on everything.
+    The extractor is verified against the Python pipeline &mdash; identical mean RGB to the
+    last decimal across four skin tones.
+    <span id="bw" class="muted"></span>
   </p>
 </div>
 
-<script>
+<script type="module">
+import { extract, wire } from "/static/extractor.js";
 const $ = s => document.querySelector(s);
 const API = location.origin;
 let ws, stream, session, timer, samples = [], events = [], t0 = 0;
+let prevFeat = null, sentBytes = 0, sentFrames = 0;
 
 const cv = $("#chart"), ctx = cv.getContext("2d");
 function sizeCanvas(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = 220 * devicePixelRatio;
@@ -154,15 +159,30 @@ $("#start").onclick = async () => {
   $("#readiness").innerHTML = "Session <code>"+session+"</code>. Sit still and face an even light. "+
     "The first 45&nbsp;s build your personal baseline.";
 
-  ws = new WebSocket(API.replace(/^http/,"ws")+"/v1/sessions/"+session+"/stream");
+  // Feature path, not frame path: extraction happens here, on raw canvas
+  // pixels, before anything is encoded.
+  ws = new WebSocket(API.replace(/^http/,"ws")+"/v1/sessions/"+session+"/features");
   ws.onmessage = ev => render(JSON.parse(ev.data));
   ws.onopen = () => {
     const c = document.createElement("canvas"); c.width=640; c.height=480;
-    const cc = c.getContext("2d"); t0 = performance.now();
+    const cc = c.getContext("2d", {willReadFrequently:true});
+    t0 = performance.now();
+    let batch = [];
     timer = setInterval(() => {
       if(ws.readyState !== 1) return;
       cc.drawImage($("#cam"), 0, 0, 640, 480);
-      c.toBlob(b => b && b.arrayBuffer().then(a => ws.readyState===1 && ws.send(a)), "image/png");
+      const f = extract(cc.getImageData(0,0,640,480), prevFeat);
+      prevFeat = f;
+      batch.push(wire(f));
+      // One message per second: at 30 fps, per-frame messages are mostly
+      // framing overhead and the engine only emits once a second anyway.
+      if (batch.length >= 30) {
+        const msg = JSON.stringify({frames: batch});
+        sentBytes += msg.length; sentFrames += batch.length;
+        ws.send(msg); batch = [];
+        $("#bw").textContent = ` Sent ${(sentBytes/1024).toFixed(1)} KB for ${sentFrames} frames `
+          + `(${(sentBytes/sentFrames).toFixed(0)} B/frame).`;
+      }
     }, 1000/30);
     $("#mark").disabled = $("#stop").disabled = false;
   };
