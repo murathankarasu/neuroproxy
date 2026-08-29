@@ -18,6 +18,17 @@ def _session(**overrides):
     return client.post("/v1/sessions", json=body)
 
 
+def _consented(**overrides):
+    """A session that has passed the consent gate, as every real one must."""
+    from api.consent import NOTICE_VERSION, SCOPES
+
+    sid = _session(**overrides).json()["session_id"]
+    r = client.post("/v1/sessions/{}/consent".format(sid),
+                    json={"scopes": sorted(SCOPES), "notice_version": NOTICE_VERSION})
+    assert r.status_code == 200, r.text
+    return sid
+
+
 def test_model_endpoint_states_the_output_contract():
     """A consumer must be told the scale is relative before reading a number."""
     info = client.get("/v1/model").json()
@@ -59,7 +70,7 @@ def test_websocket_emits_state_after_one_window():
     from training.datasets.synthetic import SyntheticConfig, generate
 
     rec = generate(SyntheticConfig(duration_s=22.0, hr_bpm=72.0))
-    sid = _session(fps=rec.fps, calibration_s=0.0).json()["session_id"]
+    sid = _consented(fps=rec.fps, calibration_s=0.0)
     received = []
     with client.websocket_connect("/v1/sessions/{}/stream".format(sid)) as ws:
         for i, frame in enumerate(rec.frames()):
@@ -79,19 +90,113 @@ def test_websocket_emits_state_after_one_window():
 
 
 def test_undecodable_frame_is_reported_not_swallowed():
-    sid = _session().json()["session_id"]
+    sid = _consented()
     with client.websocket_connect("/v1/sessions/{}/stream".format(sid)) as ws:
         ws.send_bytes(b"not an image")
         assert "error" in ws.receive_json()
 
 
-def test_demo_page_is_served_and_states_its_own_caveat():
-    """The page must carry the transport warning it is a demonstration of."""
+def test_demo_page_carries_its_own_contract():
+    """The page must state what the engine does, not just render numbers."""
     page = client.get("/")
     assert page.status_code == 200
     body = page.text
-    assert "NeuroProxy session" in body
-    # It must not silently imply an absolute score.
-    assert "bpm_vs_baseline" in body or "vs baseline" in body
-    # And it must distinguish calibrating from declining, not colour both as failure.
+    assert "NeuroProxy" in body
+    # Never implies an absolute score.
+    assert "vs your baseline" in body
+    # Distinguishes calibrating from declining, not both as failure.
     assert "calibrating" in body and "declined" in body
+    # Consent comes before the camera, and withdrawal is offered.
+    assert "/v1/consent" in body and "withdraw" in body
+    # The visual refuses along with the engine.
+    assert "stops rather than guess" in body
+
+
+
+# --- consent, retention and withdrawal -----------------------------------
+
+def test_ingest_is_refused_without_consent():
+    """No recorded grant, no session. The gate is on the socket, not the UI."""
+    from starlette.websockets import WebSocketDisconnect
+
+    sid = _session().json()["session_id"]
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/v1/sessions/{}/features".format(sid)) as ws:
+            ws.send_json({"rgb": [150, 110, 95], "valid": True})
+            ws.receive_json()
+
+
+def test_partial_consent_is_rejected():
+    """There is no mode where the camera runs but nothing is recorded."""
+    from api.consent import NOTICE_VERSION
+
+    sid = _session().json()["session_id"]
+    r = client.post("/v1/sessions/{}/consent".format(sid),
+                    json={"scopes": ["camera"], "notice_version": NOTICE_VERSION})
+    assert r.status_code == 400
+    assert "missing" in r.text
+
+
+def test_consent_to_a_superseded_notice_is_rejected():
+    """Agreeing to an old notice is agreeing to something else."""
+    sid = _session().json()["session_id"]
+    r = client.post("/v1/sessions/{}/consent".format(sid),
+                    json={"scopes": ["camera", "derived_state", "research_use"],
+                          "notice_version": "1970-01-01.0"})
+    assert r.status_code == 409
+
+
+def test_the_notice_is_retrievable_and_versioned():
+    n = client.get("/v1/consent").json()
+    assert n["version"] and n["all_required"] is True
+    assert "video does not" in n["text"].lower()
+    assert {s["key"] for s in n["scopes"]} == {"camera", "derived_state", "research_use"}
+
+
+def test_withdrawal_erases_rather_than_flags():
+    """A withdrawal that leaves the data in place is not a withdrawal."""
+    sid = _consented()
+    client.post("/v1/sessions/{}/events".format(sid), json={"label": "x", "t": 1.0})
+    assert client.get("/v1/sessions/{}/summary".format(sid)).status_code == 200
+
+    assert client.post("/v1/sessions/{}/withdraw".format(sid)).json()["erased"] is True
+    assert client.get("/v1/sessions/{}/summary".format(sid)).status_code == 404
+    assert client.get("/v1/sessions/{}/export".format(sid)).status_code == 404
+
+
+def test_export_states_that_no_video_is_held():
+    sid = _consented()
+    export = client.get("/v1/sessions/{}/export".format(sid)).json()
+    assert set(("session", "consent", "samples", "events")) <= set(export)
+    assert "no video" in export["note"].lower()
+    assert export["consent"]["notice_text"], "the exact notice shown must be recoverable"
+
+
+def test_study_aggregate_reports_coverage_next_to_every_number():
+    """A mean over sessions that mostly declined is not a finding."""
+    study = client.post("/v1/studies", json={"name": "checkout test",
+                                             "retention_days": 30}).json()
+    assert study["participant_url"].endswith(study["study_id"])
+    sid = client.post("/v1/sessions?study_id={}&external_ref=P-1".format(study["study_id"]),
+                      json={"fps": 30.0}).json()["session_id"]
+    agg = client.get("/v1/studies/{}/aggregate".format(study["study_id"])).json()
+    assert agg["participants"] == 1
+    for key in ("usable_sessions", "usable_session_rate", "pooled_answered_ratio"):
+        assert key in agg
+    assert agg["sessions"][0]["external_ref"] == "P-1"
+
+
+def test_retention_has_no_unbounded_option():
+    assert client.post("/v1/studies", json={"name": "x", "retention_days": 0}).status_code == 422
+    assert client.post("/v1/studies", json={"name": "x", "retention_days": 99999}).status_code == 422
+
+
+def test_sessions_survive_a_restart():
+    """Summaries come from the store, not from a process-local dict."""
+    import api.main as m
+
+    sid = _consented()
+    client.post("/v1/sessions/{}/events".format(sid), json={"label": "e", "t": 2.0})
+    m.SESSIONS.clear()                     # simulate a restart
+    summary = client.get("/v1/sessions/{}/summary".format(sid)).json()
+    assert summary["events"] == [{"t": 2.0, "label": "e"}]

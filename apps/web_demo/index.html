@@ -1,216 +1,376 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>NeuroProxy session</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeuroProxy</title>
 <style>
-  :root{--bg:#0f1216;--panel:#171b21;--line:#262c35;--fg:#e6eaf0;--dim:#8b95a5;
-        --ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--accent:#60a5fa}
+  :root{
+    --bg:#080b10; --panel:#11151c; --line:#1e242e; --fg:#e8edf5; --dim:#7d8899;
+    --ok:#38d996; --warn:#f5b642; --bad:#f2685f; --accent:#5aa9ff;
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);
-       font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif}
-  .wrap{max-width:1040px;margin:0 auto;padding:24px}
-  h1{font-size:18px;margin:0 0 4px}
-  .sub{color:var(--dim);margin:0 0 20px}
-  .grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
-  @media(max-width:820px){.grid{grid-template-columns:1fr}}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
-  video{width:100%;border-radius:8px;background:#000;transform:scaleX(-1)}
-  button{background:var(--accent);color:#06101f;border:0;border-radius:7px;
-         padding:9px 14px;font-weight:600;cursor:pointer}
-  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
-  button:disabled{opacity:.4;cursor:default}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
-  .stat{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line)}
+  html,body{margin:0;height:100%}
+  body{background:
+      radial-gradient(1100px 600px at 78% -8%, #14233d 0%, transparent 62%),
+      radial-gradient(800px 500px at 8% 106%, #0f2130 0%, transparent 60%), var(--bg);
+    color:var(--fg);font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 22px 40px}
+  header{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  h1{font-size:19px;letter-spacing:-.01em;margin:0;font-weight:650}
+  .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);
+       padding:2px 8px;border-radius:99px}
+  .sub{color:var(--dim);margin:0 0 22px;max-width:70ch}
+
+  .stage{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+  @media(max-width:880px){.stage{grid-template-columns:1fr}}
+  .panel{background:linear-gradient(180deg,rgba(255,255,255,.028),transparent 60%),var(--panel);
+    border:1px solid var(--line);border-radius:14px;padding:18px}
+
+  /* ---- orb ---- */
+  .orbwrap{border-radius:14px;overflow:hidden;padding-bottom:20px}
+  #orb{width:100%;height:290px;display:block}
+  .orbtext{text-align:center;margin-top:-14px}
+  .big{font-size:52px;font-weight:200;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
+       line-height:1}
+  .big small{font-size:15px;color:var(--dim);font-weight:400;margin-left:4px}
+  .orbsub{color:var(--dim);font-size:12.5px;margin-top:7px;min-height:18px}
+
+  video{width:100%;border-radius:10px;background:#05070a;transform:scaleX(-1);
+        aspect-ratio:4/3;object-fit:cover}
+
+  .stat{display:flex;justify-content:space-between;align-items:center;
+        padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
   .stat:last-child{border:0}
+  .stat span{color:var(--dim)}
   .stat b{font-variant-numeric:tabular-nums;font-weight:600}
-  .muted{color:var(--dim)}
-  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
-  .pill.ok{background:rgba(74,222,128,.15);color:var(--ok)}
-  .pill.warn{background:rgba(251,191,36,.15);color:var(--warn)}
-  .pill.bad{background:rgba(248,113,113,.15);color:var(--bad)}
-  canvas{width:100%;height:220px;display:block}
-  .legend{display:flex;gap:16px;color:var(--dim);font-size:12px;margin-top:8px;flex-wrap:wrap}
-  .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
-  .note{font-size:12px;color:var(--dim);margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-  code{background:#0b0e12;padding:1px 5px;border-radius:4px}
+
+  .bar{height:5px;background:#0a0e14;border-radius:99px;overflow:hidden;margin-top:5px}
+  .bar i{display:block;height:100%;background:var(--accent);width:0;
+         transition:width .35s ease,background .35s ease}
+
+  button{background:var(--accent);color:#04121f;border:0;border-radius:9px;
+    padding:10px 16px;font-weight:650;font-size:13.5px;cursor:pointer;
+    transition:transform .12s ease,filter .12s ease}
+  button:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.08)}
+  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+  button:disabled{opacity:.35;cursor:default;transform:none}
+  .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
+        border-radius:99px;font-size:11.5px;font-weight:650}
+  .pill.ok{background:rgba(56,217,150,.14);color:var(--ok)}
+  .pill.warn{background:rgba(245,182,66,.14);color:var(--warn)}
+  .pill.bad{background:rgba(242,104,95,.14);color:var(--bad)}
+  .dot{width:6px;height:6px;border-radius:99px;background:currentColor}
+
+  canvas#chart{width:100%;height:190px;display:block}
+  .legend{display:flex;gap:15px;color:var(--dim);font-size:11.5px;margin-top:9px;flex-wrap:wrap}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+  .step{display:none}
+  .step.on{display:block;animation:in .4s cubic-bezier(.2,.7,.3,1)}
+  @keyframes in{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+
+  .notice{white-space:pre-wrap;font-size:12.8px;color:#c3ccd9;max-height:270px;
+    overflow:auto;background:#0a0e14;border:1px solid var(--line);
+    border-radius:10px;padding:14px;line-height:1.6}
+  label.check{display:flex;gap:10px;align-items:flex-start;margin-top:12px;
+    font-size:12.8px;color:#c3ccd9;cursor:pointer}
+  label.check input{margin-top:3px;accent-color:var(--accent)}
+  .coach{font-size:13px;color:var(--fg);margin-top:12px;min-height:40px}
+  .coach b{color:var(--warn)}
+  .note{font-size:11.8px;color:var(--dim);margin-top:16px;border-top:1px solid var(--line);
+        padding-top:13px;line-height:1.65}
+  code{background:#0a0e14;padding:1px 5px;border-radius:4px;font-size:11.5px}
 </style>
 
 <div class="wrap">
-  <h1>NeuroProxy session</h1>
-  <p class="sub">Heart rate and baseline deviation from the camera, at 1 Hz.
-     The engine reports <code>null</code> with a reason whenever it will not stand behind a number.</p>
+  <header>
+    <h1>NeuroProxy</h1>
+    <span class="tag" id="phase">consent</span>
+  </header>
+  <p class="sub">Heart rate and deviation from your own baseline, from an ordinary camera.
+     Video never leaves this device.</p>
 
-  <div class="grid">
-    <div>
+  <!-- 1. consent -->
+  <section class="step on" id="s-consent">
+    <div class="panel">
+      <div class="notice" id="notice">loading…</div>
+      <label class="check"><input type="checkbox" id="agree">
+        <span id="scopes">I have read the above and agree.</span></label>
+      <div class="row">
+        <button id="accept" disabled>Agree and continue</button>
+        <span class="pill warn" style="align-self:center"><i class="dot"></i>
+          taking part is voluntary</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. guided setup -->
+  <section class="step" id="s-setup">
+    <div class="stage">
       <div class="panel">
         <video id="cam" autoplay playsinline muted></video>
-        <div class="row">
-          <button id="start">Start session</button>
-          <button id="mark" class="ghost" disabled>Mark event</button>
-          <button id="stop" class="ghost" disabled>Stop</button>
-        </div>
-        <div id="readiness" class="note">Camera not started.</div>
+        <div class="coach" id="coach">Looking for your face…</div>
+        <div class="row"><button id="begin" disabled>Start measuring</button></div>
       </div>
-
-      <div class="panel" style="margin-top:16px">
-        <div class="stat"><span class="muted">Heart rate</span><b id="hr">—</b></div>
-        <div class="stat"><span class="muted">vs baseline</span><b id="delta">—</b></div>
-        <div class="stat"><span class="muted">Confidence</span><b id="conf">—</b></div>
-        <div class="stat"><span class="muted">Signal quality</span><b id="qual">—</b></div>
-        <div class="stat"><span class="muted">Status</span><b id="status"><span class="pill warn">idle</span></b></div>
-      </div>
-    </div>
-
-    <div>
       <div class="panel">
-        <canvas id="chart"></canvas>
-        <div class="legend">
-          <span><i class="swatch" style="background:var(--accent)"></i>heart rate</span>
-          <span><i class="swatch" style="background:var(--ok)"></i>answered</span>
-          <span><i class="swatch" style="background:var(--dim)"></i>calibrating</span>
-          <span><i class="swatch" style="background:var(--bad)"></i>declined</span>
-          <span><i class="swatch" style="background:var(--warn)"></i>event</span>
-        </div>
-      </div>
-      <div class="panel" style="margin-top:16px">
-        <div id="summary" class="muted">Summary appears when the session stops.</div>
+        <div class="stat"><span>Clear skin visible</span><b id="skin">—</b></div>
+        <div class="bar"><i id="skinbar"></i></div>
+        <div class="stat" style="margin-top:12px"><span>Lighting</span><b id="light">—</b></div>
+        <div class="bar"><i id="lightbar"></i></div>
+        <div class="stat" style="margin-top:12px"><span>Stillness</span><b id="still">—</b></div>
+        <div class="bar"><i id="stillbar"></i></div>
+        <p class="note" style="border:0;padding-top:14px;margin:0">
+          Of everything measurable before a session, how much clear skin is visible on the
+          forehead and cheeks is the only thing that predicts whether it will work.
+          Below about 70%, roughly one session in five yields anything.</p>
       </div>
     </div>
-  </div>
+  </section>
+
+  <!-- 3. session -->
+  <section class="step" id="s-run">
+    <div class="stage">
+      <div>
+        <div class="panel orbwrap">
+          <canvas id="orb"></canvas>
+          <div class="orbtext">
+            <div class="big"><span id="hr">—</span><small>bpm</small></div>
+            <div class="orbsub" id="orbsub">waiting for a full window…</div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <canvas id="chart"></canvas>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--accent)"></i>heart rate</span>
+            <span><i class="sw" style="background:var(--ok)"></i>measuring</span>
+            <span><i class="sw" style="background:var(--dim)"></i>calibrating</span>
+            <span><i class="sw" style="background:var(--bad)"></i>declined</span>
+            <span><i class="sw" style="background:var(--warn)"></i>event</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="panel">
+          <video id="cam2" autoplay playsinline muted style="height:120px"></video>
+          <div class="stat" style="margin-top:12px"><span>vs your baseline</span><b id="delta">—</b></div>
+          <div class="stat"><span>Confidence</span><b id="conf">—</b></div>
+          <div class="stat"><span>Signal quality</span><b id="qual">—</b></div>
+          <div class="stat"><span>Status</span><b id="status"><span class="pill warn"><i class="dot"></i>starting</span></b></div>
+          <div class="row">
+            <button id="mark" class="ghost">Mark event</button>
+            <button id="stop" class="ghost">Finish</button>
+          </div>
+          <p class="note" id="bw">—</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. summary -->
+  <section class="step" id="s-done">
+    <div class="panel">
+      <div id="summary"></div>
+      <div class="row">
+        <button id="withdraw" class="ghost">Withdraw and erase my data</button>
+        <button id="again" class="ghost">New session</button>
+      </div>
+      <p class="note" id="code"></p>
+    </div>
+  </section>
 
   <p class="note">
-    Features are extracted <b>in this page</b> and only those are sent &mdash; about 100 bytes
-    per frame, roughly 3&nbsp;KB/s, against ~15&nbsp;MB/s for lossless frames.
-    <b>Raw video never leaves your device.</b> It also removes the codec entirely: pushing
-    JPEG&nbsp;q75 frames instead costs little accuracy but drops answered windows from 57% to
-    <b>0%</b>, because confidence falls just far enough to abstain on everything.
-    The extractor is verified against the Python pipeline &mdash; identical mean RGB to the
-    last decimal across four skin tones.
-    <span id="bw" class="muted"></span>
+    Features are extracted in this page and only those are sent &mdash; about 100 bytes per
+    frame, no images. The extractor is checked against the reference pipeline: identical mean
+    RGB to the last decimal across four skin tones. The orb stops beating when the engine
+    declines to answer rather than drifting on a stale value.
   </p>
 </div>
 
 <script type="module">
 import { extract, wire } from "/static/extractor.js";
+import { createOrb } from "/static/orb.js";
+
 const $ = s => document.querySelector(s);
 const API = location.origin;
-let ws, stream, session, timer, samples = [], events = [], t0 = 0;
-let prevFeat = null, sentBytes = 0, sentFrames = 0;
+const studyId = new URLSearchParams(location.search).get("study");
 
-const cv = $("#chart"), ctx = cv.getContext("2d");
-function sizeCanvas(){ cv.width = cv.clientWidth * devicePixelRatio; cv.height = 220 * devicePixelRatio;
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); draw(); }
-addEventListener("resize", sizeCanvas);
+let stream, session, ws, timer, orb;
+let samples = [], events = [], t0 = 0, prevFeat = null, sentBytes = 0, sentFrames = 0;
+let setupTimer = null, notice = null;
 
-function draw(){
-  const w = cv.clientWidth, h = 220, pad = {l:38,r:10,t:12,b:22};
-  ctx.clearRect(0,0,w,h);
-  const hrs = samples.filter(s=>s.hr!=null).map(s=>s.hr);
-  const lo = hrs.length ? Math.min(...hrs)-5 : 55, hi = hrs.length ? Math.max(...hrs)+5 : 100;
-  const tMax = Math.max(60, samples.length ? samples[samples.length-1].t : 0);
-  const X = t => pad.l + (w-pad.l-pad.r) * (t/tMax);
-  const Y = v => pad.t + (h-pad.t-pad.b) * (1-(v-lo)/Math.max(hi-lo,1));
+const show = id => { document.querySelectorAll(".step").forEach(s=>s.classList.remove("on"));
+  $(id).classList.add("on"); };
+const pill = (k,t) => `<span class="pill ${k}"><i class="dot"></i>${t}</span>`;
+const bar = (el,v,col) => { const e=$(el); e.style.width=(100*Math.max(0,Math.min(1,v)))+"%";
+  if(col) e.style.background=col; };
 
-  ctx.strokeStyle="#262c35"; ctx.fillStyle="#8b95a5"; ctx.font="11px system-ui"; ctx.lineWidth=1;
-  for(let i=0;i<=4;i++){ const v = lo+(hi-lo)*i/4, y = Y(v);
-    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
-    ctx.fillText(v.toFixed(0), 6, y+3); }
+/* ---------- 1. consent ---------- */
+notice = await (await fetch(API+"/v1/consent")).json();
+$("#notice").textContent = notice.text;
+$("#scopes").innerHTML = "I have read the above and agree to: "
+  + notice.scopes.map(s=>s.description.replace(/\.$/,"")).join("; ") + ".";
+$("#agree").onchange = e => $("#accept").disabled = !e.target.checked;
 
-  events.forEach(e=>{ const x=X(e.t); ctx.strokeStyle="#fbbf24"; ctx.setLineDash([3,3]);
-    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,h-pad.b); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle="#fbbf24"; ctx.fillText(e.label, x+4, pad.t+10); });
+$("#accept").onclick = async () => {
+  const url = API+"/v1/sessions" + (studyId ? "?study_id="+encodeURIComponent(studyId) : "");
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fps:30, method:"pos", calibration_s:45})});
+  if(!r.ok){ alert("Could not start a session."); return; }
+  session = (await r.json()).session_id;
+  const c = await fetch(API+"/v1/sessions/"+session+"/consent", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({scopes: notice.scopes.map(s=>s.key),
+                          notice_version: notice.version})});
+  if(!c.ok){ alert("Consent could not be recorded."); return; }
+  $("#phase").textContent = "setup";
+  show("#s-setup"); startSetup();
+};
 
-  ctx.strokeStyle="#60a5fa"; ctx.lineWidth=2; ctx.beginPath();
-  let started=false;
-  samples.forEach(s=>{ if(s.hr==null){ started=false; return; }
-    const x=X(s.t), y=Y(s.hr); started ? ctx.lineTo(x,y) : ctx.moveTo(x,y); started=true; });
-  ctx.stroke();
-
-  // Three states, deliberately. Calibrating is not declining: colouring the
-  // first 45 s red would read as failure when the engine is working normally.
-  samples.forEach(s=>{ if(s.hr==null) return;
-    ctx.fillStyle = s.answered ? "#4ade80" : (s.calibrating ? "#8b95a5" : "#f87171");
-    ctx.beginPath(); ctx.arc(X(s.t), Y(s.hr), 2.5, 0, 6.3); ctx.fill(); });
-}
-
-function pill(kind, text){ return `<span class="pill ${kind}">${text}</span>`; }
-
-function render(s){
-  $("#hr").textContent   = s.physiology?.heart_rate_bpm != null ? s.physiology.heart_rate_bpm.toFixed(1)+" bpm" : "—";
-  $("#conf").textContent = s.confidence.toFixed(2);
-  $("#qual").textContent = (s.quality?.overall ?? 0).toFixed(2);
-  const a = s.state?.arousal_proxy;
-  $("#delta").textContent = a?.value != null ? (a.value>=0?"+":"")+a.value.toFixed(1)+" bpm" : "—";
-  $("#status").innerHTML = s.state ? pill("ok","measuring")
-    : pill(s.reason==="calibrating" ? "warn" : "bad", s.reason || "no state");
-  samples.push({t:s.t, hr:s.physiology?.heart_rate_bpm ?? null,
-                answered: !!s.state, calibrating: s.reason === "calibrating"});
-  draw();
-}
-
-$("#start").onclick = async () => {
-  $("#start").disabled = true;
+/* ---------- 2. guided setup ---------- */
+async function startSetup(){
   stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480,frameRate:30}});
   $("#cam").srcObject = stream;
   await new Promise(r => $("#cam").onloadedmetadata = r);
+  const c = document.createElement("canvas"); c.width=640; c.height=480;
+  const cc = c.getContext("2d",{willReadFrequently:true});
+  let ok = 0;
+  setupTimer = setInterval(() => {
+    cc.drawImage($("#cam"),0,0,640,480);
+    const f = extract(cc.getImageData(0,0,640,480), prevFeat); prevFeat = f;
+    const sk = f.valid ? f.skin_fraction : 0;
+    $("#skin").textContent = f.valid ? (100*sk).toFixed(0)+"%" : "no face";
+    $("#light").textContent = f.valid ? f.lighting.toFixed(2) : "—";
+    $("#still").textContent = f.valid ? f.motion.toFixed(2) : "—";
+    bar("#skinbar", sk, sk>=.86?"var(--ok)":sk>=.70?"var(--warn)":"var(--bad)");
+    bar("#lightbar", f.lighting||0, (f.lighting||0)>=.6?"var(--ok)":"var(--warn)");
+    bar("#stillbar", f.motion||0, (f.motion||0)>=.7?"var(--ok)":"var(--warn)");
 
-  const r = await fetch(API+"/v1/sessions", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({fps:30, method:"pos", calibration_s:45})});
-  session = (await r.json()).session_id;
-  $("#readiness").innerHTML = "Session <code>"+session+"</code>. Sit still and face an even light. "+
-    "The first 45&nbsp;s build your personal baseline.";
+    // Coaching, not just a verdict. The check is predictive, not diagnostic,
+    // so the advice names the usual causes rather than claiming to know which.
+    let msg;
+    if(!f.valid) msg = "Looking for your face — move into the centre of the frame.";
+    else if(sk < 0.70) msg = "<b>Too little clear skin.</b> Move hair off your forehead, "
+      + "take off glasses if you can, and face a soft even light rather than a bright one to the side.";
+    else if((f.lighting||0) < 0.6) msg = "<b>Light is low.</b> Face a window or a lamp.";
+    else if((f.motion||0) < 0.7) msg = "<b>Hold still.</b> Rest your head and look at the screen.";
+    else msg = "Good. Sit still and breathe normally — the first 45 seconds build your baseline.";
+    $("#coach").innerHTML = msg;
 
-  // Feature path, not frame path: extraction happens here, on raw canvas
-  // pixels, before anything is encoded.
+    ok = (f.valid && sk>=0.70 && (f.lighting||0)>=0.6) ? ok+1 : 0;
+    $("#begin").disabled = ok < 8;   // stable for ~1.5 s, not one lucky frame
+  }, 200);
+}
+
+/* ---------- 3. session ---------- */
+$("#begin").onclick = () => {
+  clearInterval(setupTimer);
+  $("#phase").textContent = "measuring";
+  show("#s-run");
+  $("#cam2").srcObject = stream;
+  orb = createOrb($("#orb"));
+  sizeChart();
+
   ws = new WebSocket(API.replace(/^http/,"ws")+"/v1/sessions/"+session+"/features");
   ws.onmessage = ev => render(JSON.parse(ev.data));
   ws.onopen = () => {
     const c = document.createElement("canvas"); c.width=640; c.height=480;
-    const cc = c.getContext("2d", {willReadFrequently:true});
-    t0 = performance.now();
-    let batch = [];
+    const cc = c.getContext("2d",{willReadFrequently:true});
+    t0 = performance.now(); let batch = [];
     timer = setInterval(() => {
       if(ws.readyState !== 1) return;
-      cc.drawImage($("#cam"), 0, 0, 640, 480);
-      const f = extract(cc.getImageData(0,0,640,480), prevFeat);
-      prevFeat = f;
+      cc.drawImage($("#cam2"),0,0,640,480);
+      const f = extract(cc.getImageData(0,0,640,480), prevFeat); prevFeat = f;
       batch.push(wire(f));
-      // One message per second: at 30 fps, per-frame messages are mostly
-      // framing overhead and the engine only emits once a second anyway.
-      if (batch.length >= 30) {
-        const msg = JSON.stringify({frames: batch});
-        sentBytes += msg.length; sentFrames += batch.length;
-        ws.send(msg); batch = [];
-        $("#bw").textContent = ` Sent ${(sentBytes/1024).toFixed(1)} KB for ${sentFrames} frames `
-          + `(${(sentBytes/sentFrames).toFixed(0)} B/frame).`;
+      if(batch.length >= 30){
+        const msg = JSON.stringify({frames:batch});
+        sentBytes += msg.length; sentFrames += batch.length; ws.send(msg); batch = [];
+        $("#bw").textContent = `${(sentBytes/1024).toFixed(0)} KB sent for ${sentFrames} frames `
+          + `(${(sentBytes/sentFrames).toFixed(0)} B/frame). No images leave this page.`;
       }
     }, 1000/30);
-    $("#mark").disabled = $("#stop").disabled = false;
   };
 };
 
+function render(s){
+  const hr = s.physiology?.heart_rate_bpm ?? null;
+  const measuring = !!s.state;
+  $("#hr").textContent = hr!=null ? hr.toFixed(0) : "—";
+  $("#conf").textContent = s.confidence.toFixed(2);
+  $("#qual").textContent = (s.quality?.overall ?? 0).toFixed(2);
+  const a = s.state?.arousal_proxy;
+  $("#delta").textContent = a?.value!=null ? (a.value>=0?"+":"")+a.value.toFixed(1)+" bpm" : "—";
+  $("#status").innerHTML = measuring ? pill("ok","measuring")
+    : pill(s.reason==="calibrating"?"warn":"bad", s.reason||"no state");
+  $("#orbsub").textContent = measuring ? "beating at the measured rate"
+    : s.reason==="calibrating" ? "building your baseline…"
+    : "not measurable right now — the orb stops rather than guess";
+  orb && orb.set({heartRate:hr, measuring, confidence:s.confidence,
+                  detail:(s.quality?.overall ?? 0.5)});
+  samples.push({t:s.t, hr, answered:measuring, calibrating:s.reason==="calibrating"});
+  drawChart();
+}
+
+/* ---------- chart ---------- */
+const cv = $("#chart"), ctx = cv.getContext("2d");
+function sizeChart(){ cv.width=cv.clientWidth*devicePixelRatio; cv.height=190*devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); drawChart(); }
+addEventListener("resize", sizeChart);
+function drawChart(){
+  const w=cv.clientWidth, h=190, pad={l:36,r:10,t:12,b:20};
+  ctx.clearRect(0,0,w,h);
+  const hrs = samples.filter(s=>s.hr!=null).map(s=>s.hr);
+  const lo = hrs.length?Math.min(...hrs)-5:55, hi = hrs.length?Math.max(...hrs)+5:100;
+  const tMax = Math.max(60, samples.length?samples[samples.length-1].t:0);
+  const X = t => pad.l+(w-pad.l-pad.r)*(t/tMax), Y = v => pad.t+(h-pad.t-pad.b)*(1-(v-lo)/Math.max(hi-lo,1));
+  ctx.strokeStyle="#1e242e"; ctx.fillStyle="#7d8899"; ctx.font="10.5px system-ui";
+  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(v.toFixed(0),6,y+3); }
+  events.forEach(e=>{ const x=X(e.t); ctx.strokeStyle="#f5b642"; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,h-pad.b); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle="#f5b642"; ctx.fillText(e.label,x+4,pad.t+10); });
+  ctx.strokeStyle="#5aa9ff"; ctx.lineWidth=2; ctx.beginPath(); let started=false;
+  samples.forEach(s=>{ if(s.hr==null){started=false;return;} const x=X(s.t),y=Y(s.hr);
+    started?ctx.lineTo(x,y):ctx.moveTo(x,y); started=true; });
+  ctx.stroke();
+  samples.forEach(s=>{ if(s.hr==null) return;
+    ctx.fillStyle = s.answered?"#38d996":(s.calibrating?"#7d8899":"#f2685f");
+    ctx.beginPath(); ctx.arc(X(s.t),Y(s.hr),2.4,0,6.3); ctx.fill(); });
+}
+
+/* ---------- events, finish, withdraw ---------- */
 $("#mark").onclick = async () => {
-  const label = prompt("Event label", "stimulus") || "event";
+  const label = prompt("Event label","stimulus") || "event";
   const t = (performance.now()-t0)/1000;
-  await fetch(API+"/v1/sessions/"+session+"/events", {method:"POST",
-    headers:{"Content-Type":"application/json"}, body: JSON.stringify({label, t})});
-  events.push({label, t}); draw();
+  await fetch(API+"/v1/sessions/"+session+"/events",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({label,t})});
+  events.push({label,t}); drawChart();
 };
 
 $("#stop").onclick = async () => {
   clearInterval(timer); ws && ws.close();
   stream && stream.getTracks().forEach(t=>t.stop());
-  $("#mark").disabled = $("#stop").disabled = true; $("#start").disabled = false;
+  $("#phase").textContent = "done"; show("#s-done");
   const s = await (await fetch(API+"/v1/sessions/"+session+"/summary")).json();
-  const reasons = Object.entries(s.reasons||{}).map(([k,v])=>`${k}: ${v}`).join(", ") || "none";
+  const reasons = Object.entries(s.reasons||{}).map(([k,v])=>`${k} ${v}`).join(", ") || "none";
   $("#summary").innerHTML = `
-    <div class="stat"><span class="muted">Duration</span><b>${s.duration_s.toFixed(0)} s</b></div>
-    <div class="stat"><span class="muted">Emissions</span><b>${s.emissions}</b></div>
-    <div class="stat"><span class="muted">Answered</span><b>${(100*s.answered_ratio).toFixed(0)}%</b></div>
-    <div class="stat"><span class="muted">Heart rate (median)</span><b>${
-      s.heart_rate_bpm.median!=null ? s.heart_rate_bpm.median.toFixed(1)+" bpm" : "—"}</b></div>
-    <div class="stat"><span class="muted">Mean confidence</span><b>${s.mean_confidence.toFixed(2)}</b></div>
-    <div class="stat"><span class="muted">Declined because</span><b>${reasons}</b></div>`;
+    <div class="stat"><span>Duration</span><b>${s.duration_s.toFixed(0)} s</b></div>
+    <div class="stat"><span>Measurements</span><b>${s.emissions}</b></div>
+    <div class="stat"><span>Answered</span><b>${(100*s.answered_ratio).toFixed(0)}%</b></div>
+    <div class="stat"><span>Heart rate (median)</span><b>${
+      s.heart_rate_bpm.median!=null?s.heart_rate_bpm.median.toFixed(1)+" bpm":"—"}</b></div>
+    <div class="stat"><span>Declined because</span><b>${reasons}</b></div>`;
+  $("#code").innerHTML = `Your session code is <code>${session}</code>. `
+    + `Keep it if you may want to withdraw later.`;
 };
 
-sizeCanvas();
+$("#withdraw").onclick = async () => {
+  if(!confirm("This erases every measurement from this session. Continue?")) return;
+  await fetch(API+"/v1/sessions/"+session+"/withdraw",{method:"POST"});
+  $("#summary").innerHTML = "<b>Withdrawn.</b> Every measurement from this session has been erased.";
+  $("#withdraw").disabled = true; $("#code").textContent = "";
+};
+
+$("#again").onclick = () => location.reload();
 </script>

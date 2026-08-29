@@ -1373,3 +1373,71 @@ throttles when hidden. That is a harness limitation, not a code fault, and the
 fix was to verify on small controlled fixtures that exercise the same code
 paths. Worth recording so the next person does not conclude the extractor is
 slow: on a 64x64 frame it runs in 6.8 ms.
+
+## 26. Studies, consent and the guided setup
+
+Three product layers, built in the order that the sensor work implied.
+
+### Persistence
+
+Sessions lived in a module-level dict: a restart lost everything and a second
+worker saw nothing of the first. `api/store.py` moves studies, sessions,
+samples, events and consent into SQLite. Summaries are now served from the
+store, so `tests/test_api.py::test_sessions_survive_a_restart` clears the
+in-memory map and still gets the session back.
+
+### Consent, gated on the data path
+
+Both ingest sockets refuse a session with no recorded grant. Putting the gate
+on the socket rather than the interface means a client that skips the consent
+screen gets nothing, rather than getting through.
+
+Four decisions worth stating:
+
+- **The notice is versioned and stored verbatim with each grant.** A consent
+  record that cannot reproduce what the person was shown records nothing, and
+  editing the text later would silently re-attribute old agreements. Consent
+  against a superseded version is rejected with 409.
+- **No partial consent.** There is no mode where the camera runs but the
+  measurements are not kept, so the page does not offer a checkbox pretending
+  otherwise.
+- **Withdrawal erases.** Samples, events, consent and the session row are
+  deleted. Flagging a row and trusting every future query to filter it is not
+  withdrawal.
+- **Retention has no unbounded option** and is applied by a purge endpoint.
+  Retention that is documented but never executed is a policy, not a control.
+
+The notice itself claims only what the code does, including that the engine
+**will often decline to answer** -- roughly half of real sessions yield little
+(sections 15-16). Telling participants that up front is more honest than a
+progress bar implying success.
+
+Legal posture is in `docs/privacy.md`, kept deliberately separate: the
+mechanisms are engineering and are done; whether a study is lawful is not, and
+is not claimed here.
+
+### Guided setup
+
+Section 16 found that skin fraction is the only pre-session predictor of
+whether a session will work, and that it is measurable in about two seconds.
+The setup step now uses it live: a gauge, and coaching that names the usual
+causes -- hair over the forehead, glasses, a hard side light -- rather than a
+verdict. The start button unlocks only after the reading has been stable for
+~1.5 s, so one lucky frame cannot let a doomed session through.
+
+**This is untested against outcomes.** Whether coaching actually moves skin
+fraction, and whether that converts failing sessions into working ones, needs
+real participants. The thresholds it coaches toward (0.70 marginal, 0.86 good)
+are in-sample from 25 subjects and will need re-deriving.
+
+### The visualisation refuses too
+
+The session view is a WebGL orb that beats at the measured rate. When the
+engine declines, the orb **stops and desaturates** rather than drifting on the
+last known value.
+
+That is not decoration. A visualisation that keeps animating through an
+abstention quietly undoes the thing the confidence system exists to do: a
+participant or researcher watching a smoothly pulsing orb has no way to know
+the number underneath it is two minutes stale. Verified in a browser in both
+states.

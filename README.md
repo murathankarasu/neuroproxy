@@ -36,6 +36,11 @@ produces confident numbers with nothing underneath them.
 | Live camera source with capture-settings reporting | written, not run here |
 | Single-session web demo (timeline, events, summary) | done, served at `/` |
 | Client-side feature extraction (~3 KB/s, no raw video) | done, equivalence verified |
+| Persistence: studies, sessions, samples survive restart | done, tested |
+| Consent gate, versioned notice, withdrawal-erases | done, tested |
+| Retention windows, purge, participant data export | done, tested |
+| Guided setup with live coaching before the session | done |
+| Study-level aggregate with coverage alongside | done, tested |
 | Neural rPPG (EfficientPhys, pretrained) | benchmarked, **does not transfer** |
 | Fine-tuning, waveform objective | **blocked by label sync**, limitations 22 |
 | Fine-tuning, phase-invariant objective | works; error halved, still behind POS |
@@ -329,8 +334,19 @@ MAE <= 5 bpm, coverage >= 80%) is missed, so this can gate CI.
 .venv/bin/uvicorn api.main:app --reload
 ```
 
-Then open http://localhost:8000 for a full session: camera consent, 45 s
-calibration, live timeline with event markers, and an end-of-session summary.
+Then open http://localhost:8000 for a full session: consent, guided setup,
+45 s calibration, live timeline with event markers, and a summary with a
+withdraw-and-erase option.
+
+Create a study and hand out its participant link:
+
+```bash
+curl -s localhost:8000/v1/studies -H 'Content-Type: application/json' \
+  -d '{"name":"checkout test","retention_days":30}'
+```
+
+`GET /v1/studies/{id}/aggregate` reports the usable-session rate alongside every
+aggregate, because a mean over sessions that mostly declined is not a finding.
 
 `POST /v1/sessions` to open one, push frames over
 `WS /v1/sessions/{id}/stream`, read `GET /v1/sessions/{id}/summary`. State is
@@ -374,6 +390,23 @@ training/
   evaluation/ metrics, harness, risk-coverage calibration, ablations
 docs/         limitations.md -- read before quoting any number
 ```
+
+## Privacy
+
+Video never reaches the server: features are extracted in the participant's
+browser and only those are sent. That is structural rather than a promise --
+the feature route has no image decoder and the store has no column that could
+hold one.
+
+Consent is gated on the data path, not the interface: both socket routes refuse
+a session with no recorded grant. The notice is versioned and its exact text is
+stored with each grant. Withdrawal erases rather than flags. Retention windows
+are enforced by a purge endpoint, with no unbounded option.
+
+Camera-derived heart rate is health data and likely special category under GDPR
+Article 9. [docs/privacy.md](docs/privacy.md) sets out what the system does so
+counsel has something accurate to work from; it is not legal advice, and the
+mechanisms being in place does not by itself make a study compliant.
 
 ## Ground rules
 

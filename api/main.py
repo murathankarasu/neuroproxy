@@ -45,6 +45,8 @@ from pydantic import BaseModel, Field
 from fastapi.responses import FileResponse
 from pathlib import Path as _Path
 
+from api.consent import NOTICE_VERSION, NOTICE_TEXT, notice, validate
+from api.store import Store
 from neuroproxy.inference import FramePacket, StateEngine, StateSample
 from neuroproxy.rppg.base import available_methods
 
@@ -86,7 +88,136 @@ class Session:
     closed: bool = False
 
 
+# Live engines, keyed by session. Durable state lives in the store; this holds
+# only the rolling buffers, which are meaningless after a restart anyway.
 SESSIONS: Dict[str, Session] = {}
+STORE = Store()
+
+
+class StudyConfig(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    session: SessionConfig = Field(default_factory=SessionConfig)
+    # No unbounded option. Retention that is never reached is not retention.
+    retention_days: int = Field(90, ge=1, le=730)
+
+
+class ConsentGrant(BaseModel):
+    scopes: List[str]
+    notice_version: str
+
+
+def _require_consent(session_id: str) -> Dict[str, object]:
+    """Gate every ingest path. Without a recorded grant there is no session."""
+    record = STORE.get_consent(session_id)
+    if record is None or record.get("withdrawn_at"):
+        raise HTTPException(403, "no active consent for this session")
+    return record
+
+
+@app.post("/v1/studies")
+def create_study(cfg: StudyConfig) -> Dict[str, object]:
+    study_id = STORE.create_study(
+        cfg.name, cfg.session.model_dump(), retention_days=cfg.retention_days)
+    return {"study_id": study_id, "name": cfg.name,
+            "retention_days": cfg.retention_days,
+            "participant_url": "/?study={}".format(study_id)}
+
+
+@app.get("/v1/studies")
+def list_studies() -> Dict[str, object]:
+    return {"studies": STORE.list_studies()}
+
+
+@app.get("/v1/studies/{study_id}")
+def get_study(study_id: str) -> Dict[str, object]:
+    study = STORE.get_study(study_id)
+    if study is None:
+        raise HTTPException(404, "unknown study")
+    sessions = STORE.study_sessions(study_id)
+    return {**study, "sessions": len(sessions)}
+
+
+@app.get("/v1/studies/{study_id}/aggregate")
+def aggregate(study_id: str) -> Dict[str, object]:
+    """Study-level view across participants.
+
+    Reports coverage alongside every aggregate. A mean heart rate over sessions
+    that mostly declined to answer is not a finding, and the number that says
+    so has to travel with it.
+    """
+    if STORE.get_study(study_id) is None:
+        raise HTTPException(404, "unknown study")
+    rows = []
+    for sess in STORE.study_sessions(study_id):
+        samples = STORE.get_samples(sess["session_id"])
+        answered = [s for s in samples if s.get("state")]
+        hrs = [s["physiology"]["heart_rate_bpm"] for s in samples
+               if (s.get("physiology") or {}).get("heart_rate_bpm") is not None]
+        rows.append({
+            "session_id": sess["session_id"],
+            "external_ref": sess["external_ref"],
+            "emissions": len(samples),
+            "answered": len(answered),
+            "answered_ratio": (len(answered) / len(samples)) if samples else 0.0,
+            "median_hr": float(np.median(hrs)) if hrs else None,
+            "usable": bool(samples) and (len(answered) / len(samples)) >= 0.5,
+        })
+    usable = [r for r in rows if r["usable"]]
+    return {
+        "study_id": study_id,
+        "participants": len(rows),
+        # The product-level number: of everyone who took part, how many
+        # produced anything worth analysing.
+        "usable_sessions": len(usable),
+        "usable_session_rate": (len(usable) / len(rows)) if rows else 0.0,
+        "pooled_answered_ratio": (
+            sum(r["answered"] for r in rows) / max(sum(r["emissions"] for r in rows), 1)),
+        "sessions": rows,
+    }
+
+
+@app.get("/v1/consent")
+def consent_notice() -> Dict[str, object]:
+    return notice()
+
+
+@app.post("/v1/sessions/{session_id}/consent")
+def grant_consent(session_id: str, grant: ConsentGrant) -> Dict[str, object]:
+    if STORE.get_session(session_id) is None:
+        raise HTTPException(404, "unknown session")
+    if grant.notice_version != NOTICE_VERSION:
+        # Consent to a superseded notice is consent to something else.
+        raise HTTPException(
+            409, "notice has changed; re-read and grant against version {}".format(
+                NOTICE_VERSION))
+    try:
+        scopes = validate(grant.scopes)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return STORE.record_consent(session_id, NOTICE_VERSION, NOTICE_TEXT, scopes)
+
+
+@app.post("/v1/sessions/{session_id}/withdraw")
+def withdraw(session_id: str) -> Dict[str, object]:
+    """Withdraw and erase. Available during or after a session."""
+    if STORE.get_session(session_id) is None:
+        raise HTTPException(404, "unknown session")
+    SESSIONS.pop(session_id, None)
+    return STORE.withdraw(session_id)
+
+
+@app.get("/v1/sessions/{session_id}/export")
+def export(session_id: str) -> Dict[str, object]:
+    """Everything held about this session, for a participant access request."""
+    if STORE.get_session(session_id) is None:
+        raise HTTPException(404, "unknown session")
+    return STORE.export_session(session_id)
+
+
+@app.post("/v1/admin/purge")
+def purge() -> Dict[str, int]:
+    """Apply each study's retention window. Intended to run on a schedule."""
+    return STORE.purge_expired()
 
 
 DEMO_DIR = _Path(__file__).resolve().parents[1] / "apps" / "web_demo"
@@ -111,12 +242,17 @@ def demo() -> FileResponse:
 
 
 @app.post("/v1/sessions", response_model=SessionCreated)
-def create_session(config: SessionConfig) -> SessionCreated:
+def create_session(
+    config: SessionConfig, study_id: Optional[str] = None,
+    external_ref: Optional[str] = None,
+) -> SessionCreated:
     if config.method not in available_methods():
         raise HTTPException(400, "unknown method {!r}".format(config.method))
-    session_id = uuid.uuid4().hex[:12]
+    if study_id is not None and STORE.get_study(study_id) is None:
+        raise HTTPException(404, "unknown study")
     from neuroproxy.rppg.base import get_method
 
+    session_id = STORE.create_session(study_id, config.model_dump(), external_ref)
     SESSIONS[session_id] = Session(
         session_id=session_id,
         config=config,
@@ -152,15 +288,18 @@ def model_info() -> Dict[str, object]:
 def mark_event(session_id: str, event: EventMark) -> Dict[str, object]:
     session = _require(session_id)
     t = event.t if event.t is not None else session.engine._n_frames / session.config.fps
-    record = {"label": event.label, "t": float(t)}
+    record = STORE.add_event(session_id, float(t), event.label)
     session.events.append(record)
     return record
 
 
 @app.get("/v1/sessions/{session_id}/summary")
 def summary(session_id: str) -> Dict[str, object]:
-    session = _require(session_id)
-    samples = session.samples
+    """Session summary. Served from the store, so it survives a restart."""
+    if STORE.get_session(session_id) is None:
+        raise HTTPException(404, "unknown session {!r}".format(session_id))
+    stored = STORE.get_samples(session_id)
+    samples = [StateSample(**s) for s in stored]
     answered = [s for s in samples if s.state is not None]
     hrs = [
         s.physiology["heart_rate_bpm"] for s in samples
@@ -183,7 +322,7 @@ def summary(session_id: str) -> Dict[str, object]:
         },
         "mean_confidence": float(np.mean([s.confidence for s in samples])) if samples else 0.0,
         "reasons": _count_reasons(samples),
-        "events": session.events,
+        "events": STORE.get_events(session_id),
         "timeline": [s.as_dict() for s in samples],
     }
 
@@ -205,6 +344,11 @@ async def features(websocket: WebSocket, session_id: str) -> None:
         await websocket.close(code=4404)
         return
     try:
+        _require_consent(session_id)
+    except HTTPException:
+        await websocket.close(code=4403)
+        return
+    try:
         while True:
             data = await websocket.receive_json()
             if data.get("close"):
@@ -216,6 +360,8 @@ async def features(websocket: WebSocket, session_id: str) -> None:
                 if sample is not None:
                     session.samples.append(sample)
                     emitted.append(sample.as_dict())
+            if emitted:
+                STORE.append_samples(session_id, emitted)
             for sample in emitted:
                 await websocket.send_json(sample)
     except WebSocketDisconnect:
@@ -264,6 +410,11 @@ async def stream(websocket: WebSocket, session_id: str) -> None:
     if session is None:
         await websocket.close(code=4404)
         return
+    try:
+        _require_consent(session_id)
+    except HTTPException:
+        await websocket.close(code=4403)
+        return
 
     try:
         while True:
@@ -288,6 +439,7 @@ async def stream(websocket: WebSocket, session_id: str) -> None:
             sample = session.engine.push(frame)
             if sample is not None:
                 session.samples.append(sample)
+                STORE.append_samples(session_id, [sample.as_dict()])
                 await websocket.send_json(sample.as_dict())
     except WebSocketDisconnect:
         pass
