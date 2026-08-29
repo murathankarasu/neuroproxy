@@ -1,0 +1,29 @@
+# Environments and build artefacts
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Datasets. Licensed separately, large, and not ours to redistribute.
+# See docs/datasets.md for how to obtain each one.
+data/
+
+# Pretrained weights from rPPG-Toolbox, under the Responsible AI Source Code
+# License. Redistributing them would put its behavioural restrictions on
+# whoever downloads this repo without their knowing. Fetch them with
+# scripts/fetch_models.sh instead.
+models/
+
+# Benchmark outputs are reproducible from the harness; the numbers that matter
+# are written into docs/limitations.md.
+results/
+
+*.avi
+*.mp4
+
+# Strategy and design documents. Kept locally; the technical substance they
+# contain lives in README.md and docs/ instead.
+*.pdf

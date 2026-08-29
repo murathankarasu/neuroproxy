@@ -1,0 +1,10 @@
+{
+  "_comment": "Local dataset roots. Nothing here is downloaded automatically; each dataset has its own licence and access request. Leave a value empty to mark it unavailable.",
+  "roots": {
+    "ubfc_rppg": "",
+    "ubfc_phys": "",
+    "pure": "",
+    "scamps": "data/scamps/scamps_videos_example",
+    "mcd_rppg": "data/mcd"
+  }
+}

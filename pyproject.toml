@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neuroproxy"
+version = "0.1.0"
+description = "Camera-based physiological state engine: sensor layer and benchmark harness"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "opencv-python-headless>=4.7",
+]
+
+[project.optional-dependencies]
+# Landmark-accurate face tracking. The pipeline degrades to Haar without it.
+landmarks = ["mediapipe>=0.10"]
+# Feature-model stage (design doc 5.1), not yet used.
+models = ["scikit-learn>=1.2", "xgboost>=1.7"]
+# Neural rPPG stage. Pretrained checkpoints go in models/; see
+# docs/limitations.md section 19 for what they do and do not deliver.
+neural = ["torch>=2.0"]
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.27"]
+dev = ["pytest>=7.0", "httpx>=0.27"]
+
+[project.scripts]
+neuroproxy = "neuroproxy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["neuroproxy*", "training*", "api*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
