@@ -15,7 +15,7 @@ const VERT = `
 attribute vec3 aPos;
 uniform mat4 uProj, uView;
 uniform float uTime, uBeat, uDetail, uQuiet;
-varying vec3 vNormal; varying float vDisp;
+varying vec3 vNormal; varying float vDisp; varying float vNoise; varying vec3 vWorld;
 
 float hash(vec3 p){ return fract(sin(dot(p, vec3(17.1,31.7,74.3))) * 43758.5453); }
 float noise(vec3 p){
@@ -37,24 +37,32 @@ void main(){
   // Cardiac envelope: a sharp systolic rise and a slower decay, not a sine.
   float beat = uBeat;
   float disp = 1.0 + beat*0.10 + turb*uDetail*(1.0-uQuiet*0.85);
-  vDisp = beat; vNormal = n;
+  vDisp = beat; vNoise = turb; vNormal = n; vWorld = n*disp;
   gl_Position = uProj * uView * vec4(n*disp, 1.0);
 }`;
 
 const FRAG = `
 precision highp float;
-varying vec3 vNormal; varying float vDisp;
+varying vec3 vNormal; varying float vDisp; varying float vNoise; varying vec3 vWorld;
 uniform float uQuiet, uConf;
 void main(){
-  vec3 L = normalize(vec3(0.4, 0.7, 0.8));
+  vec3 L = normalize(vec3(-0.35, 0.78, 0.62));
   float lambert = max(dot(vNormal, L), 0.0);
-  float rim = pow(1.0 - max(dot(vNormal, vec3(0.0,0.0,1.0)), 0.0), 2.4);
-  // Measuring: a live blue-cyan. Declining: drained toward grey.
-  vec3 live = mix(vec3(0.16,0.33,0.72), vec3(0.35,0.85,0.95), 0.35 + vDisp*0.9);
-  vec3 dead = vec3(0.30,0.33,0.38);
+  float facing = max(dot(vNormal, vec3(0.0,0.0,1.0)), 0.0);
+  float rim = pow(1.0-facing, 2.15);
+  float bands = smoothstep(.22,.78,sin((vWorld.y+vNoise*.8)*20.0)*.5+.5);
+  // Measuring: an electric cyan-violet material. Declining: drained to slate.
+  vec3 deep = vec3(0.10,0.16,0.48);
+  vec3 cyan = vec3(0.24,0.92,1.0);
+  vec3 violet = vec3(0.46,0.34,0.98);
+  vec3 live = mix(deep, cyan, .42 + lambert*.34 + vDisp*.45);
+  live = mix(live, violet, bands*.18 + max(-vNoise,0.0)*.45);
+  vec3 dead = vec3(0.26,0.30,0.38);
   vec3 base = mix(live, dead, uQuiet);
-  vec3 col = base*(0.30 + 0.75*lambert) + rim*mix(vec3(0.45,0.85,1.0), vec3(0.25), uQuiet)*0.9;
-  gl_FragColor = vec4(col * (0.55 + 0.45*uConf), 1.0);
+  vec3 edge = mix(vec3(0.42,0.94,1.0), vec3(0.34), uQuiet);
+  vec3 col = base*(0.34 + 0.78*lambert) + rim*edge*(.72 + uConf*.42);
+  col += pow(max(dot(vNormal,normalize(vec3(-.6,.7,.5))),0.0),28.0)*vec3(.8,1.0,1.0)*.7;
+  gl_FragColor = vec4(col * (0.58 + 0.42*uConf), 1.0);
 }`;
 
 function icosphere(subdiv) {
@@ -104,6 +112,8 @@ export function createOrb(canvas) {
   gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(prog, n);
   gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
   // State the orb animates toward, so changes ease rather than jump.
   let hr = null, quiet = 1, conf = 0, detail = 1, phase = 0, last = performance.now();

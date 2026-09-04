@@ -3,96 +3,141 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NeuroProxy — studies</title>
 <style>
-  :root{--bg:#080b10;--panel:#11151c;--line:#1e242e;--fg:#e8edf5;--dim:#7d8899;
-        --ok:#38d996;--warn:#f5b642;--bad:#f2685f;--accent:#5aa9ff}
+  :root{--bg:#050811;--panel:rgba(14,20,32,.78);--panel2:#0b111e;--line:rgba(151,181,222,.13);
+        --line2:rgba(105,231,255,.22);--fg:#f3f7ff;--dim:#8190a7;--ok:#48e7b8;
+        --warn:#ffc76a;--bad:#ff7788;--accent:#69e7ff;--violet:#8878ff}
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{background:radial-gradient(1100px 600px at 82% -10%,#14233d 0,transparent 62%),
-       radial-gradient(700px 460px at 4% 104%,#0f2130 0,transparent 60%),var(--bg);
-       color:var(--fg);font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-  .wrap{max-width:1180px;margin:0 auto;padding:28px 22px 48px}
-  header{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
-  h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.01em}
-  .tag{font-size:11px;color:var(--dim);border:1px solid var(--line);padding:2px 8px;border-radius:99px}
-  .sub{color:var(--dim);margin:0 0 22px;max-width:74ch}
-  .panel{background:linear-gradient(180deg,rgba(255,255,255,.028),transparent 60%),var(--panel);
-         border:1px solid var(--line);border-radius:14px;padding:18px}
-  .grid{display:grid;grid-template-columns:340px 1fr;gap:18px}
-  @media(max-width:900px){.grid{grid-template-columns:1fr}}
-  input{background:#0a0e14;border:1px solid var(--line);color:var(--fg);
-        border-radius:8px;padding:9px 11px;font:inherit;width:100%}
-  label{display:block;font-size:12px;color:var(--dim);margin:12px 0 5px}
-  button{background:var(--accent);color:#04121f;border:0;border-radius:9px;padding:10px 15px;
-         font-weight:650;font-size:13.5px;cursor:pointer;transition:transform .12s,filter .12s}
-  button:hover{transform:translateY(-1px);filter:brightness(1.08)}
-  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+  body{background:
+       radial-gradient(900px 540px at 76% -10%,rgba(43,98,176,.24),transparent 65%),
+       radial-gradient(760px 560px at -8% 92%,rgba(28,120,136,.14),transparent 64%),var(--bg);
+       color:var(--fg);font:14px/1.55 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+       overflow-x:hidden}
+  body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;z-index:-1;
+       background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+       linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:48px 48px;
+       mask-image:linear-gradient(to bottom,black,transparent 78%)}
+  .wrap{max-width:1380px;margin:0 auto;padding:24px 28px 56px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .brand{display:flex;align-items:center;gap:11px}.brandmark{width:34px;height:34px;border-radius:11px;
+       position:relative;background:linear-gradient(145deg,rgba(105,231,255,.18),rgba(136,120,255,.1));
+       border:1px solid var(--line2);box-shadow:inset 0 0 18px rgba(105,231,255,.08),0 8px 30px rgba(0,0,0,.24)}
+  .brandmark:before,.brandmark:after{content:"";position:absolute;border-radius:50%;border:1px solid var(--accent)}
+  .brandmark:before{inset:8px}.brandmark:after{inset:12px;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+  h1{font-size:16px;margin:0;font-weight:680;letter-spacing:-.01em}.brand small{display:block;color:var(--dim);font-size:9px;letter-spacing:.14em;text-transform:uppercase}
+  .tag{font-size:10px;color:var(--accent);border:1px solid var(--line2);padding:5px 10px;border-radius:99px;
+       background:rgba(105,231,255,.045);letter-spacing:.08em;text-transform:uppercase}
+  .live{display:flex;align-items:center;gap:7px;color:var(--dim);font-size:11px}.live i{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pulse 2s infinite}
+  .top-actions{display:flex;align-items:center;gap:16px}
+  .hero{display:grid;grid-template-columns:minmax(320px,.86fr) minmax(470px,1.14fr);gap:18px;margin-bottom:18px;align-items:stretch}
+  .hero-copy{padding:34px 34px 30px;display:flex;flex-direction:column;justify-content:center}
+  .eyebrow{color:var(--accent);font-size:10px;letter-spacing:.19em;text-transform:uppercase;font-weight:700;margin-bottom:12px}
+  .hero h2{font-size:clamp(30px,4vw,54px);line-height:1.04;letter-spacing:-.055em;font-weight:330;margin:0 0 16px;max-width:720px}
+  .hero h2 em{font-style:normal;color:transparent;background:linear-gradient(90deg,var(--accent),#a69bff);background-clip:text}
+  .sub{color:var(--dim);margin:0;max-width:66ch;font-size:13px}.hero .sub{font-size:14px;max-width:56ch}
+  .panel{position:relative;background:linear-gradient(145deg,rgba(255,255,255,.032),transparent 45%),var(--panel);
+         border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 18px 55px rgba(0,0,0,.18);
+         backdrop-filter:blur(18px);transition:border-color .25s,transform .25s,box-shadow .25s}
+  .panel:before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,rgba(105,231,255,.055),transparent 26%)}
+  .scene{min-height:330px;overflow:hidden;padding:0;background:radial-gradient(circle at 50% 48%,rgba(40,78,126,.18),transparent 56%),rgba(8,13,24,.76)}
+  #constellation{width:100%;height:330px;display:block}.scene-caption{position:absolute;left:22px;right:22px;bottom:18px;display:flex;justify-content:space-between;align-items:end;pointer-events:none}
+  .scene-caption b{font-size:12px;font-weight:600}.scene-caption span{font-size:10px;color:var(--dim);display:block;margin-top:3px}.scene-key{display:flex;gap:12px!important;flex-direction:row}.scene-key i{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px}
+  .grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+  .grid>*{min-width:0}.sidebar{position:sticky;top:18px;min-width:0}#detail{min-width:0}.section-title{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:#aebbd0;font-weight:650}
+  @media(max-width:960px){.hero{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.sidebar{position:static}}
+  @media(max-width:620px){.wrap{padding:18px 14px 40px}.hero-copy{padding:26px 22px}.top-actions .live{display:none}.link{flex-wrap:wrap}.link code{width:100%;min-width:0;flex-basis:100%}.tablewrap{width:100%;max-width:100%;overflow:auto}.hero h2{font-size:34px}.chart-head{align-items:flex-start;gap:12px}.chart-head small{white-space:nowrap}.panel{min-width:0}}
+  input{background:rgba(3,8,15,.65);border:1px solid var(--line);color:var(--fg);
+        border-radius:10px;padding:11px 12px;font:inherit;width:100%;outline:none;transition:border-color .2s,box-shadow .2s}
+  input:focus{border-color:rgba(105,231,255,.52);box-shadow:0 0 0 3px rgba(105,231,255,.07)}
+  label{display:block;font-size:11px;color:var(--dim);margin:14px 0 6px}
+  button{background:linear-gradient(135deg,var(--accent),#7bc8ff);color:#03111a;border:0;border-radius:10px;padding:10px 15px;
+         font-weight:680;font-size:12px;cursor:pointer;transition:transform .16s,filter .16s,box-shadow .16s;box-shadow:0 8px 24px rgba(79,200,255,.12)}
+  button:hover{transform:translateY(-2px);filter:brightness(1.07);box-shadow:0 10px 30px rgba(79,200,255,.2)}
+  button.ghost{background:rgba(255,255,255,.025);color:var(--fg);border:1px solid var(--line);box-shadow:none}
   .row{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px;align-items:center}
   table{width:100%;border-collapse:collapse;font-size:13px}
   th{text-align:left;color:var(--dim);font-weight:500;font-size:11.5px;
-     text-transform:uppercase;letter-spacing:.05em;padding:0 10px 9px 0;border-bottom:1px solid var(--line)}
-  td{padding:10px 10px 10px 0;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+     text-transform:uppercase;letter-spacing:.07em;padding:0 12px 11px;border-bottom:1px solid var(--line)}
+  td{padding:12px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;color:#cbd5e5}
+  tbody tr{transition:background .2s}tbody tr:hover{background:rgba(105,231,255,.025)}
   tr:last-child td{border:0}
   .pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:99px;
         font-size:11px;font-weight:650}
-  .pill.ok{background:rgba(56,217,150,.14);color:var(--ok)}
-  .pill.bad{background:rgba(242,104,95,.14);color:var(--bad)}
+  .pill.ok{background:rgba(72,231,184,.11);color:var(--ok);border:1px solid rgba(72,231,184,.14)}
+  .pill.bad{background:rgba(255,119,136,.1);color:var(--bad);border:1px solid rgba(255,119,136,.14)}
   .dot{width:6px;height:6px;border-radius:99px;background:currentColor}
-  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
-  .kpi .panel{padding:14px 16px}
-  .kpi b{display:block;font-size:26px;font-weight:250;letter-spacing:-.02em;
-         font-variant-numeric:tabular-nums;margin-top:2px}
-  .kpi span{color:var(--dim);font-size:11.5px}
+  .kpi{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+  .kpi .panel{padding:17px 18px;min-height:108px;overflow:hidden}.kpi .panel:hover{transform:translateY(-3px);border-color:var(--line2);box-shadow:0 20px 50px rgba(0,0,0,.24)}
+  .kpi b{display:block;font-size:28px;font-weight:300;letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin-top:11px;position:relative}
+  .kpi span{color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.08em}.kpi-icon{position:absolute!important;right:15px;top:15px;width:28px;height:28px;border-radius:9px;background:rgba(105,231,255,.06);display:grid!important;place-items:center;color:var(--accent)!important;font-size:13px!important}
+  @media(max-width:660px){.kpi{grid-template-columns:repeat(2,1fr)}}
   .link{display:flex;gap:8px;align-items:center;margin-top:12px}
-  .link code{flex:1;background:#0a0e14;border:1px solid var(--line);border-radius:8px;
-             padding:9px 11px;font-size:12px;overflow:auto;white-space:nowrap}
-  .studyrow{display:flex;justify-content:space-between;padding:11px 0;
-            border-bottom:1px solid var(--line);cursor:pointer}
-  .studyrow:hover{color:var(--accent)}
+  .link code{flex:1;background:rgba(3,8,15,.62);border:1px solid var(--line);border-radius:10px;
+             padding:10px 12px;font-size:11px;overflow:auto;white-space:nowrap;color:#9eacc0}
+  .studyrow{display:flex;justify-content:space-between;padding:12px 10px;border-radius:10px;
+            border-bottom:1px solid var(--line);cursor:pointer;transition:.2s;margin:2px 0}
+  .studyrow:hover,.studyrow.active{color:var(--accent);background:rgba(105,231,255,.045);transform:translateX(2px)}
   .studyrow:last-child{border:0}
-  canvas{width:100%;height:230px;display:block}
+  canvas{width:100%;height:260px;display:block}.analytics{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(220px,.55fr);gap:16px;margin-top:16px}.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}.chart-head small{color:var(--dim);font-size:10px}.rings{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:25px}.ring{--p:0;--c:var(--accent);width:96px;aspect-ratio:1;margin:auto;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--c) calc(var(--p)*1%),rgba(255,255,255,.055) 0);position:relative;box-shadow:0 0 32px color-mix(in srgb,var(--c) 10%,transparent);transition:--p .6s}.ring:after{content:"";position:absolute;inset:8px;border-radius:50%;background:#0c1320;border:1px solid var(--line)}.ring b{position:relative;z-index:1;font-size:18px;font-weight:400}.ring-label{text-align:center;color:var(--dim);font-size:10px;margin-top:9px;text-transform:uppercase;letter-spacing:.08em}
+  @media(max-width:1080px){.analytics{grid-template-columns:1fr}.rings{max-width:360px;margin:20px auto 0}}
   .note{font-size:11.8px;color:var(--dim);margin-top:16px;border-top:1px solid var(--line);
         padding-top:13px;line-height:1.65}
-  .warnbox{background:rgba(245,182,66,.08);border:1px solid rgba(245,182,66,.3);
-           border-radius:10px;padding:12px 14px;font-size:12.5px;color:#e8d5a8;margin-bottom:18px}
+  .warnbox{background:rgba(255,199,106,.06);border:1px solid rgba(255,199,106,.2);
+           border-radius:12px;padding:11px 13px;font-size:11px;color:#d5c49f;margin-top:20px}.warnbox b{color:var(--warn)}
   .hide{display:none}
+  @keyframes pulse{50%{opacity:.45;box-shadow:0 0 2px var(--ok)}}
+  @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important}}
 </style>
 
 <div class="wrap">
-  <header><h1>NeuroProxy</h1><span class="tag">researcher</span></header>
-  <p class="sub">Create a study, hand out its link, and watch sessions arrive. Coverage is
-     reported next to every aggregate: a mean over sessions that mostly declined is not a finding.</p>
+  <header>
+    <div class="brand"><i class="brandmark"></i><div><h1>NeuroProxy</h1><small>Research console</small></div></div>
+    <div class="top-actions"><span class="live"><i></i>live pipeline</span><span class="tag">Researcher</span></div>
+  </header>
 
-  <div class="warnbox">
-    <b>No authentication.</b> Anyone who can reach this server can read every study.
-    Fine on a laptop, not fine anywhere else. Do not expose this host.
-  </div>
+  <section class="hero">
+    <div class="panel hero-copy">
+      <div class="eyebrow">Physiological intelligence</div>
+      <h2>Human signals,<br><em>made visible.</em></h2>
+      <p class="sub">Create a study, share its link, and watch every measurable heartbeat become a clear, privacy-first signal.</p>
+      <div class="warnbox"><b>No authentication · local demo.</b> Do not expose this host outside your trusted network.</div>
+    </div>
+    <div class="panel scene">
+      <canvas id="constellation" aria-label="Animated 3D session constellation"></canvas>
+      <div class="scene-caption">
+        <div><b>Signal constellation</b><span id="scene-note">Waiting for study data</span></div>
+        <span class="scene-key"><span><i style="background:var(--ok)"></i>usable</span><span><i style="background:var(--bad)"></i>low signal</span></span>
+      </div>
+    </div>
+  </section>
 
   <div class="grid">
-    <div>
+    <aside class="sidebar">
       <div class="panel">
-        <b style="font-size:13px">New study</b>
+        <div class="section-title">New study</div>
         <label for="name">Name</label>
         <input id="name" placeholder="Checkout flow test">
         <label for="ret">Retention (days) — data is deleted automatically after this</label>
         <input id="ret" type="number" value="30" min="1" max="730">
-        <div class="row"><button id="create">Create study</button></div>
+        <div class="row"><button id="create">Create study &nbsp;↗</button></div>
       </div>
       <div class="panel" style="margin-top:16px">
-        <b style="font-size:13px">Studies</b>
+        <div class="section-title">Studies</div>
         <div id="studies" style="margin-top:8px"><span class="sub">loading…</span></div>
       </div>
-    </div>
+    </aside>
 
     <div id="detail" class="hide">
       <div class="kpi">
-        <div class="panel"><span>Participants</span><b id="k-participants">—</b></div>
-        <div class="panel"><span>Usable sessions</span><b id="k-usable">—</b></div>
-        <div class="panel"><span>Answered windows</span><b id="k-answered">—</b></div>
-        <div class="panel"><span>Retention</span><b id="k-ret">—</b></div>
+        <div class="panel"><span class="kpi-icon">◎</span><span>Participants</span><b id="k-participants">—</b></div>
+        <div class="panel"><span class="kpi-icon">◇</span><span>Usable sessions</span><b id="k-usable">—</b></div>
+        <div class="panel"><span class="kpi-icon">∿</span><span>Answered windows</span><b id="k-answered">—</b></div>
+        <div class="panel"><span class="kpi-icon">↻</span><span>Retention</span><b id="k-ret">—</b></div>
       </div>
 
       <div class="panel">
-        <b style="font-size:13px" id="d-name">—</b>
+        <div class="section-title">Active study</div>
+        <b style="display:block;font-size:18px;font-weight:450;margin-top:8px" id="d-name">—</b>
         <div class="link">
           <code id="d-link">—</code>
           <button class="ghost" id="copy">Copy</button>
@@ -103,19 +148,28 @@
           that checks whether their camera can produce a usable signal before the session starts.</p>
       </div>
 
-      <div class="panel" style="margin-top:16px">
-        <b style="font-size:13px">Heart rate across participants</b>
-        <canvas id="chart"></canvas>
-        <p class="note" style="border:0;padding-top:8px;margin:6px 0 0" id="chartnote">—</p>
+      <div class="analytics">
+        <div class="panel">
+          <div class="chart-head"><div class="section-title">Heart rate · participant overlay</div><small>beats per minute</small></div>
+          <canvas id="chart"></canvas>
+          <p class="note" style="border:0;padding-top:8px;margin:6px 0 0" id="chartnote">—</p>
+        </div>
+        <div class="panel">
+          <div class="section-title">Signal health</div>
+          <div class="rings">
+            <div><div class="ring" id="ring-usable" style="--c:var(--ok)"><b id="ring-usable-value">—</b></div><div class="ring-label">Usable</div></div>
+            <div><div class="ring" id="ring-answered" style="--c:var(--accent)"><b id="ring-answered-value">—</b></div><div class="ring-label">Answered</div></div>
+          </div>
+          <p class="note">Coverage remains visible beside the aggregate, so a selective signal is never mistaken for a complete one.</p>
+        </div>
       </div>
 
       <div class="panel" style="margin-top:16px">
-        <b style="font-size:13px">Sessions</b>
-        <table style="margin-top:10px">
-          <thead><tr><th>Session</th><th>Ref</th><th>Scored</th><th>Answered</th>
-                     <th>Median HR</th><th>Status</th></tr></thead>
+        <div class="section-title">Session stream</div>
+        <div class="tablewrap"><table style="margin-top:14px">
+          <thead><tr><th>Session</th><th>Ref</th><th>Scored</th><th>Answered</th><th>Median HR</th><th>Status</th></tr></thead>
           <tbody id="rows"></tbody>
-        </table>
+        </table></div>
         <p class="note" id="empty"></p>
       </div>
     </div>
@@ -123,19 +177,25 @@
 </div>
 
 <script type="module">
+import { createConstellation } from "/static/constellation.js";
+
 const $ = s => document.querySelector(s);
 const API = location.origin;
 let current = null, timer = null;
+const constellation = createConstellation($("#constellation"));
 
 const fmtPct = v => (100*v).toFixed(0)+"%";
+const esc = value => String(value).replace(/[&<>"']/g, c => ({
+  "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"
+}[c]));
 
 async function loadStudies(){
   const {studies} = await (await fetch(API+"/v1/studies")).json();
   const el = $("#studies");
   if(!studies.length){ el.innerHTML = `<span class="sub">No studies yet.</span>`; return; }
   el.innerHTML = studies.map(s=>`
-    <div class="studyrow" data-id="${s.study_id}">
-      <span>${s.name}</span>
+    <div class="studyrow ${s.study_id===current?"active":""}" data-id="${esc(s.study_id)}">
+      <span>${esc(s.name)}</span>
       <span style="color:var(--dim);font-size:12px">${s.retention_days}d</span>
     </div>`).join("");
   el.querySelectorAll(".studyrow").forEach(r =>
@@ -145,6 +205,7 @@ async function loadStudies(){
 
 async function select(id){
   current = id;
+  document.querySelectorAll(".studyrow").forEach(r=>r.classList.toggle("active",r.dataset.id===id));
   $("#detail").classList.remove("hide");
   // Size the canvas only after the panel is visible. Measuring it while the
   // panel is still display:none gives clientWidth 0, and the chart then never
@@ -169,11 +230,22 @@ async function refresh(){
     ? `${agg.usable_sessions} (${fmtPct(agg.usable_session_rate)})` : "—";
   $("#k-answered").textContent = agg.participants ? fmtPct(agg.pooled_answered_ratio) : "—";
   $("#k-ret").textContent = study.retention_days + " days";
+  const usablePct = agg.participants ? Math.round(agg.usable_session_rate*100) : 0;
+  const answeredPct = agg.participants ? Math.round(agg.pooled_answered_ratio*100) : 0;
+  $("#ring-usable").style.setProperty("--p", usablePct);
+  $("#ring-answered").style.setProperty("--p", answeredPct);
+  $("#ring-usable-value").textContent = agg.participants ? usablePct+"%" : "—";
+  $("#ring-answered-value").textContent = agg.participants ? answeredPct+"%" : "—";
+  $("#scene-note").textContent = agg.participants
+    ? `${agg.participants} session${agg.participants===1?"":"s"} · ${usablePct}% usable signal`
+    : "No sessions in this study yet";
+  constellation.set({sessions:agg.sessions, usableRate:agg.usable_session_rate,
+                     answeredRate:agg.pooled_answered_ratio});
 
   $("#rows").innerHTML = agg.sessions.map(s=>`
     <tr>
-      <td style="font-family:ui-monospace,monospace;font-size:11.5px">${s.session_id}</td>
-      <td>${s.external_ref ?? "—"}</td>
+      <td style="font-family:ui-monospace,monospace;font-size:11.5px">${esc(s.session_id)}</td>
+      <td>${esc(s.external_ref ?? "—")}</td>
       <td>${s.scored}</td>
       <td>${s.scored ? fmtPct(s.answered_ratio) : "—"}</td>
       <td>${s.median_hr!=null ? s.median_hr.toFixed(1) : "—"}</td>
@@ -193,7 +265,7 @@ async function refresh(){
    interpolated: joining across an abstention would draw a line through data
    the engine explicitly refused to provide. */
 const cv = $("#chart"), ctx = cv.getContext("2d");
-function sizeChart(){ cv.width=cv.clientWidth*devicePixelRatio; cv.height=230*devicePixelRatio;
+function sizeChart(){ cv.width=cv.clientWidth*devicePixelRatio; cv.height=260*devicePixelRatio;
   ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
 addEventListener("resize", () => { sizeChart(); refresh(); });
 sizeChart();
@@ -206,25 +278,29 @@ async function drawOverlay(sessions){
     series.push({id:s.session_id, points: (sum.timeline||[])
       .map(p=>({t:p.t, hr:p.physiology?.heart_rate_bpm ?? null, answered: !!p.state}))});
   }
-  const w=cv.clientWidth, h=230, pad={l:38,r:12,t:14,b:22};
+  const w=cv.clientWidth, h=260, pad={l:42,r:16,t:18,b:26};
   ctx.clearRect(0,0,w,h);
   const all = series.flatMap(s=>s.points.filter(p=>p.hr!=null&&p.answered).map(p=>p.hr));
   const lo = all.length?Math.min(...all)-5:55, hi = all.length?Math.max(...all)+5:100;
   const tMax = Math.max(60, ...series.flatMap(s=>s.points.map(p=>p.t)), 60);
   const X=t=>pad.l+(w-pad.l-pad.r)*(t/tMax), Y=v=>pad.t+(h-pad.t-pad.b)*(1-(v-lo)/Math.max(hi-lo,1));
 
-  ctx.strokeStyle="#1e242e"; ctx.fillStyle="#7d8899"; ctx.font="10.5px system-ui";
+  const grid = ctx.createLinearGradient(pad.l,0,w-pad.r,0);
+  grid.addColorStop(0,"rgba(129,144,167,.08)"); grid.addColorStop(1,"rgba(105,231,255,.16)");
+  ctx.strokeStyle=grid; ctx.fillStyle="#8190a7"; ctx.font="10px system-ui";
   for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
     ctx.fillText(v.toFixed(0),6,y+3); }
 
   series.forEach((s,i)=>{
-    ctx.strokeStyle = `hsla(${205 + i*24}, 70%, 62%, .75)`; ctx.lineWidth=1.6;
+    const hue = 184 + (i*31)%118;
+    ctx.strokeStyle = `hsla(${hue}, 78%, 66%, .68)`; ctx.lineWidth=1.7;
+    ctx.shadowColor=`hsla(${hue}, 88%, 65%, .3)`; ctx.shadowBlur=7;
     ctx.beginPath(); let started=false;
     s.points.forEach(p=>{
       if(p.hr==null || !p.answered){ started=false; return; }
       const x=X(p.t), y=Y(p.hr); started?ctx.lineTo(x,y):ctx.moveTo(x,y); started=true; });
-    ctx.stroke();
+    ctx.stroke(); ctx.shadowBlur=0;
   });
 
   $("#chartnote").textContent = series.length
