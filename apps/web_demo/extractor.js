@@ -83,7 +83,12 @@ function adaptiveSkin(data, w, h, face) {
 
 export function extract(imageData, prev) {
   const { data, width: w, height: h } = imageData;
-  const face = (prev && prev.face) || detectByColour(data, w, h);
+  // Detect on every frame, as the Python path does (test_client_extraction:
+  // `detector.detect(frame)` per frame). An earlier version reused
+  // `prev.face` to skip detection, but that field is the *confidence scalar*,
+  // not the box -- so every second frame was measured against the number 0.6,
+  // produced NaN bounds and was dropped as invalid. `prev` is only for motion.
+  const face = detectByColour(data, w, h);
   const empty = { rgb: null, valid: false, face: 0, lighting: 0, sharpness: 0,
                   motion: 1, skin_fraction: 0, compression: 1, _face: null };
   if (!face) return empty;
